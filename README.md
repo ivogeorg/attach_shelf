@@ -26,10 +26,11 @@ _Optional, but good practice with entity states._
 
 1. Subscriber to `/scan` (`sensor_msgs/msg/LaserScan`).
 2. Subscriber to `/odom` (`nav_msgs/msg/Odometry`).
-2. Publisher to `/diffbot_base_controller/cmd_vel_unstamped` (`geometry_msgs/msg/Twist`).
-3. Client to service `/approach_shelf` (custom `GoToLanding.srv`).  
-4. Publisher to `/elevator_up` (`std_msgs/msg/Empty`).  
-5. Publisher to `/elevator_down` (`std_msgs/msg/Empty`).  
+3. Publisher to `/diffbot_base_controller/cmd_vel_unstamped` (`geometry_msgs/msg/Twist`).
+4. Timer for velocity publisher.
+5. Client to service `/approach_shelf` (custom `GoToLanding.srv`).  
+6. Publisher to `/elevator_up` (`std_msgs/msg/Empty`).  
+7. Publisher to `/elevator_down` (`std_msgs/msg/Empty`).  
 
 ##### 3. Adding a frame
 
@@ -43,3 +44,27 @@ Need to add a frame in the middle of the reflective plates of the shelf.
 ##### 4. `tf2_ros::TransformListener` for precision movement
 
 1. Use a `TransformListener` with `cart_frame` and `robot_base_footprint` frame of the robot to issue precision commands for the final approach.
+
+
+##### 5. Parametrizing the laser scanner
+
+1. This is a weird one!  
+   ```
+   angle_min: -2.3561999797821045
+   angle_max: 2.3561999797821045
+   angle_increment: 0.004363333340734243
+   time_increment: 0.0
+   scan_time: 0.0
+   range_min: 0.05999999865889549
+   range_max: 20.0
+   ```
+2. Thanks to the new [`LaserScannerPoker`](src/laser_scanner_poker.cpp):
+   ```
+   [laser_scanner_poker_node-1] [INFO] [1722708445.226614735] [laser_scanner_poker_node]: angle_min = -2.356200 rad
+   [laser_scanner_poker_node-1] [INFO] [1722708445.226731971] [laser_scanner_poker_node]: angle_max = 2.356200 rad
+   [laser_scanner_poker_node-1] [INFO] [1722708445.226743815] [laser_scanner_poker_node]: angle_increment = 0.004363 rad
+   [laser_scanner_poker_node-1] [INFO] [1722708445.226753163] [laser_scanner_poker_node]: range_min = 0.060000 rad
+   [laser_scanner_poker_node-1] [INFO] [1722708445.226761269] [laser_scanner_poker_node]: range_max = 20.000000 rad
+   [laser_scanner_poker_node-1] [INFO] [1722708445.226769927] [laser_scanner_poker_node]: ranges size = 1081
+   ```
+

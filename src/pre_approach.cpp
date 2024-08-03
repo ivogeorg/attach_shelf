@@ -27,7 +27,7 @@ private:
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   enum class Motion { FORWARD, TURN, STOP };
   Motion motion_;
-  const double LINEAR_BASE = 0.1;
+  const double LINEAR_BASE = 0.5;
   const double ANGULAR_BASE = 0.1;
   const double LINEAR_TOLERANCE = 0.01; // meters
   const double ANGULAR_TOLERANCE = 0.5; // degrees
@@ -77,16 +77,21 @@ private:
 
     switch (motion_) {
     case Motion::FORWARD:
-      // TODO
-      // if moving_forward_
-      //    if abs(distance-to-wall (forward) + tolerance)) is more than
-      //    'obstacle'  ???
-      twist.linear.x = LINEAR_BASE;
-      twist.angular.z = 0.0;
-      //     else moving_forward_ == false;
-      //          motion_ = Motion::TURN;
-      //          twist.linear.x = 0.0;
-      //          twist.angular.z = 0.0;
+      if (moving_forward_) {
+        if (front_obstacle_dist() >= obstacle_ + LINEAR_TOLERANCE) {
+          RCLCPP_DEBUG(this->get_logger(), "Approaching wall, distance = %f m",
+                       front_obstacle_dist());
+          twist.linear.x = LINEAR_BASE;
+          twist.angular.z = 0.0;
+        } else {
+          RCLCPP_DEBUG(this->get_logger(), "Stopping at wall, distance = %f m",
+                       front_obstacle_dist());
+          moving_forward_ = false;
+          motion_ = Motion::TURN;
+          twist.linear.x = 0.0;
+          twist.angular.z = 0.0;
+        }
+      }
       break;
     case Motion::TURN:
       static double last_angle;
@@ -104,6 +109,8 @@ private:
            (abs(turn_angle + ANGULAR_TOLERANCE) < abs(goal_angle))) ||
           (goal_angle < 0 && (abs(turn_angle - ANGULAR_TOLERANCE) <
                               abs(goal_angle)))) { // need to turn (more)
+        RCLCPP_DEBUG(this->get_logger(), "Starting rotation, angle = %f deg",
+                     turn_angle * RAD2DEG);
         twist.linear.x = 0.0;
         twist.angular.z = ANGULAR_BASE;
 
@@ -117,8 +124,8 @@ private:
       } else {
         // reached goal angle within tolerance, stop turning
         //   RCLCPP_DEBUG(this->get_logger(), "Resulting yaw %f", yaw_);
-        RCLCPP_INFO(this->get_logger(),
-                    "Turned within tolerance of new direction");
+        RCLCPP_DEBUG(this->get_logger(), "Stopping rotation, angle = %f deg",
+                     turn_angle * RAD2DEG);
         twist.linear.x = 0.0;
         twist.angular.z = 0.0;
 
@@ -128,6 +135,7 @@ private:
       break;
     case Motion::STOP:
     default:
+      RCLCPP_DEBUG(this->get_logger(), "Stopped");
       twist.linear.x = 0.0;
       twist.angular.z = 0.0;
     }
@@ -176,6 +184,8 @@ private:
     // TODO: More parametrization for shelf legs
     // robot_patrol/patrol_with_service.cpp (325)
 
+    RCLCPP_INFO(this->get_logger(), "Laser scanner parametrized");
+
     laser_scanner_parametrized_ = true;
   }
 
@@ -203,6 +213,7 @@ private:
       RCLCPP_INFO(this->get_logger(),
                   "'scan' topic publisher not available, waiting...");
     }
+    RCLCPP_INFO(this->get_logger(), "'scan' topic publisher acquired");
   }
 
   void wait_for_odometery_publisher() {
@@ -218,6 +229,7 @@ private:
       RCLCPP_INFO(this->get_logger(),
                   "'odom' topic publisher not available, waiting...");
     }
+    RCLCPP_INFO(this->get_logger(), "'odom' topic publisher acquired");
   }
 
   double yaw_from_quaternion(double x, double y, double z, double w) {
@@ -236,7 +248,23 @@ private:
 
 int main(int argc, char **argv) {
   rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<RB1Approach>());
+
+  auto node = std::make_shared<RB1Approach>();
+
+  auto logger = rclcpp::get_logger("rb1_pre_approach_node");
+
+  // Set the log level to DEBUG
+  if (rcutils_logging_set_logger_level(
+          logger.get_name(), RCUTILS_LOG_SEVERITY_DEBUG) != RCUTILS_RET_OK) {
+    // Handle the error (e.g., print an error message or throw an exception)
+    RCLCPP_ERROR(logger,
+                 "Failed to set logger level for rb1_pre_approach_node.");
+  } else {
+    RCLCPP_INFO(logger,
+                "Successfully set logger level for rb1_pre_approach_node.");
+  }
+
+  rclcpp::spin(node);
   rclcpp::shutdown();
 
   return 0;
