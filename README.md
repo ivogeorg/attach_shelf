@@ -68,3 +68,36 @@ Need to add a frame in the middle of the reflective plates of the shelf.
    [laser_scanner_poker_node-1] [INFO] [1722708445.226769927] [laser_scanner_poker_node]: ranges size = 1081
    ```
 
+##### 6. Logging
+
+1. Setting logging severity level (map frees from dependency on actual values):
+   ```
+   std::map<int, std::string> levels = {
+       {RCUTILS_LOG_SEVERITY::RCUTILS_LOG_SEVERITY_DEBUG, "DEBUG"},
+       {RCUTILS_LOG_SEVERITY::RCUTILS_LOG_SEVERITY_INFO, "INFO"},
+       {RCUTILS_LOG_SEVERITY::RCUTILS_LOG_SEVERITY_WARN, "WARN"},
+       {RCUTILS_LOG_SEVERITY::RCUTILS_LOG_SEVERITY_ERROR, "ERROR"},
+       {RCUTILS_LOG_SEVERITY::RCUTILS_LOG_SEVERITY_FATAL, "FATAL"}
+   };
+   int level = RCUTILS_LOG_SEVERITY::RCUTILS_LOG_SEVERITY_INFO;
+   if (rcutils_logging_set_logger_level(logger.get_name(), level) !=
+       RCUTILS_RET_OK) {
+     RCLCPP_ERROR(logger,
+                  "Failed to set logger level '%s' for rb1_pre_approach_node.",
+                  (levels[level]).c_str());
+   } else {
+     RCLCPP_INFO(logger,
+                 "Successfully set logger level '%s' for rb1_pre_approach_node.",
+                 (levels[level]).c_str());
+   }
+   ```
+2. Available settings (should not rely on these int values):
+   ```
+   enum RCUTILS_LOG_SEVERITY {
+       RCUTILS_LOG_SEVERITY_DEBUG = 0, 
+       RCUTILS_LOG_SEVERITY_INFO = 1, 
+       RCUTILS_LOG_SEVERITY_WARN = 2, 
+       RCUTILS_LOG_SEVERITY_ERROR = 3,
+       RCUTILS_LOG_SEVERITY_FATAL = 4
+   }
+   ```
