@@ -11,6 +11,7 @@ find_package(rclcpp REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -25,7 +26,7 @@ if(BUILD_TESTING)
 endif()
 
 add_executable(pre_approach_node src/pre_approach.cpp)
-ament_target_dependencies(pre_approach_node rclcpp geometry_msgs sensor_msgs)
+ament_target_dependencies(pre_approach_node rclcpp geometry_msgs sensor_msgs nav_msgs)
 
 install(TARGETS
 			pre_approach_node

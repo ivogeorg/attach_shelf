@@ -25,6 +25,7 @@ _Optional, but good practice with entity states._
 ##### 2. ROS2 objects
 
 1. Subscriber to `/scan` (`sensor_msgs/msg/LaserScan`).
+2. Subscriber to `/odom` (`nav_msgs/msg/Odometry`).
 2. Publisher to `/diffbot_base_controller/cmd_vel_unstamped` (`geometry_msgs/msg/Twist`).
 3. Client to service `/approach_shelf` (custom `GoToLanding.srv`).  
 4. Publisher to `/elevator_up` (`std_msgs/msg/Empty`).  
