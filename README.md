@@ -31,15 +31,27 @@ _Optional, but good practice with entity states._
 5. Client to service `/approach_shelf` (custom `GoToLanding.srv`).  
 6. Publisher to `/elevator_up` (`std_msgs/msg/Empty`).  
 7. Publisher to `/elevator_down` (`std_msgs/msg/Empty`).  
+8. Service server and client.
+9. Transform listener.
 
 ##### 3. Adding a frame
 
 Need to add a frame in the middle of the reflective plates of the shelf.  
 
-1. Use the `intensities` array of the `sensor_msgs/msg/LaserScan` to identify the points of incidence on the two reflective plates. The intensities should be significantly higher for them than other points.
-2. There should be two clusters. Use the `ranges` to get their centers. Then find the midpoint between them.
-3. Use this point to add a frame `cart_frame` to the tree. Tutorial for [adding a frame](https://docs.ros.org/en/humble/Tutorials/Intermediate/Tf2/Adding-A-Frame-Cpp.html).  
+![Reflective plates in space](assets/reflective_plates_in_space.png)  
 
+1. General approach:
+   1. Use the `intensities` array of the `sensor_msgs/msg/LaserScan` to identify the points of incidence on the two reflective plates. The intensities should be significantly higher for them than for other points.
+   2. There should be two clusters. Use the `ranges` to get their centers. Then find the midpoint between them.
+   3. Use this point to add a frame `cart_frame` to the tree. Tutorial for [adding a frame](https://docs.ros.org/en/humble/Tutorials/Intermediate/Tf2/Adding-A-Frame-Cpp.html).  
+2. Algorithmic details:
+   1. The origin frame of the scanner is `robot_front_laser_base_link`. Using the angle of a ray and its measured range to a point can yield the point's frame.
+   2. The frames of the high-intesity points can be used for 3D k-means clustering, which will yield 1 or 2 clusters and the cluster centroids (with frames).
+   3. From two points in 3D space, the midpoint between them can be found. The frame `cart_frame` can be computed and arranged so that it represents a meaningful motion goal for the robot.
+   4. Using a transform between `robot_front_laser_base_link` and `cart_frame`, send `Twist` messages to the robot to move toward `cart_frame`.
+   5. Move the robot forward for 30 more cm. This can be done with another frame or with `Odomerty` data.
+3. The goal is:
+   ![Cart frame added](assets/cart_frame.png)   
 
 ##### 4. `tf2_ros::TransformListener` for precision movement
 

@@ -6,11 +6,8 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
-        - /RobotModel1
-        - /RobotModel1/Status1
         - /TF1/Tree1
         - /LaserScan1
-        - /LaserScan1/Topic1
       Splitter Ratio: 0.5792078971862793
     Tree Height: 553
   - Class: rviz_common/Selection
@@ -217,13 +214,13 @@ Visualization Manager:
       Selectable: true
       Size (Pixels): 3
       Size (m): 0.009999999776482582
-      Style: Flat Squares
+      Style: Points
       Topic:
         Depth: 5
         Durability Policy: Volatile
         Filter size: 10
         History Policy: Keep Last
-        Reliability Policy: Reliable
+        Reliability Policy: Best Effort
         Value: /scan
       Use Fixed Frame: true
       Use rainbow: true
@@ -274,25 +271,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 1.1381654739379883
+      Distance: 0.9643528461456299
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0
-        Y: 0
-        Z: 0
+        X: 5.6174492835998535
+        Y: 0.5746423602104187
+        Z: 1.9444169998168945
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.005398363806307316
+      Pitch: 1.0703983306884766
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 0.44539961218833923
+      Yaw: 1.5953991413116455
     Saved: ~
 Window Geometry:
   Displays:
