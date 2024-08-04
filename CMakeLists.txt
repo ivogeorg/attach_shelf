@@ -31,9 +31,13 @@ ament_target_dependencies(pre_approach_node rclcpp geometry_msgs sensor_msgs nav
 add_executable(laser_scanner_poker_node src/laser_scanner_poker.cpp)
 ament_target_dependencies(laser_scanner_poker_node rclcpp sensor_msgs)
 
+add_executable(intensity_poker_node src/intensity_poker.cpp)
+ament_target_dependencies(intensity_poker_node rclcpp sensor_msgs)
+
 install(TARGETS
 			pre_approach_node
 			laser_scanner_poker_node
+			intensity_poker_node
 	DESTINATION lib/${PROJECT_NAME}
 )
 

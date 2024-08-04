@@ -51,8 +51,7 @@ void LaserScannerPoker::laser_scan_callback(
     RCLCPP_INFO(this->get_logger(), "intensities size = %d",
                 static_cast<int>(last_laser_.intensities.size()));
 
-    // TODO: get 'front', 'left', and 'right'
-    int front, left, right;
+    int front;
     int size = static_cast<int>(last_laser_.ranges.size());
 
     // 'front' should be just ranges size /2
