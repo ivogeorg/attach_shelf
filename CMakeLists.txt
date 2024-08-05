@@ -12,6 +12,7 @@ find_package(tf2_ros REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -25,8 +26,16 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
+rosidl_generate_interfaces(${PROJECT_NAME}
+	"srv/GoToLoading.srv"
+	# DEPENDENCIES sensor_msgs geometry_msgs
+)
+
 add_executable(pre_approach_node src/pre_approach.cpp)
 ament_target_dependencies(pre_approach_node rclcpp geometry_msgs sensor_msgs nav_msgs)
+
+add_executable(pre_approach_v2_node src/pre_approach.cpp)
+ament_target_dependencies(pre_approach_v2_node rclcpp geometry_msgs sensor_msgs nav_msgs)
 
 add_executable(laser_scanner_poker_node src/laser_scanner_poker.cpp)
 ament_target_dependencies(laser_scanner_poker_node rclcpp sensor_msgs)
@@ -34,10 +43,22 @@ ament_target_dependencies(laser_scanner_poker_node rclcpp sensor_msgs)
 add_executable(intensity_poker_node src/intensity_poker.cpp)
 ament_target_dependencies(intensity_poker_node rclcpp sensor_msgs)
 
+add_executable(approach_shelf_service_server_node src/approach_service_server.cpp)
+ament_target_dependencies(approach_shelf_service_server_node rclcpp geometry_msgs nav_msgs sensor_msgs)
+
+# Get the typesupport target name
+rosidl_get_typesupport_target(typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+# Link against the generated interface library
+# NOTE: CMake, no keywords (PRIVATE, PUBLIC) or all keywords (can't mix)
+target_link_libraries(approach_shelf_service_server_node ${typesupport_target})
+
 install(TARGETS
 			pre_approach_node
+			pre_approach_v2_node
 			laser_scanner_poker_node
 			intensity_poker_node
+			approach_shelf_service_server_node
 	DESTINATION lib/${PROJECT_NAME}
 )
 
