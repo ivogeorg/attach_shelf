@@ -6,8 +6,22 @@ An RB1 robot in a simulated warehouse world moves forward, turns, detects a shel
 
 #### Submission notes
 
-TODO  
+##### 1. Task 1 - Pre-approach
 
+1. Launching
+   ```
+   cd ~/ros2_ws/src
+   git clone https://github.com/ivogeorg/attach_shelf.git
+   cd ~/ros2_ws
+   colcon build --packages-select attach_shelf
+   source install/setup.bash
+   ros2 launch attach_shelf pre_approach.launch.xml obstacle:=0.39 degrees:=-92.0
+   ```
+2. Note that the values for the arguments do not need to have such precision as the noise in the robot movement defeats them most of the time. It is not possible to achieve perfect alignment of the robot and the shelf/crate so that the robot can move underneath it by only going forward. The `/approach_shelf` is more likely to achieve sufficient accuracy by using a `TransformListener` and issue corrective `Twist` messages to the robot as it approaches.
+3. Expected result
+   | Gazebo | Rviz2 |
+   | --- | --- |
+   | ![Pre-approach in Gazebo](assets/subm_pre_approach_gazebo.png) | ![Pre-approach in Rviz2](assets/subm_pre_approach_rviz2.png) |
 
 #### Implementation notes*
 
@@ -112,4 +126,63 @@ Need to add a frame in the middle of the reflective plates of the shelf.
        RCUTILS_LOG_SEVERITY_ERROR = 3,
        RCUTILS_LOG_SEVERITY_FATAL = 4
    }
+   ```
+
+##### 7. Using parameters from launch file
+
+1. Launch file declares parameters by name and default value, which is not enough by itself. See next step
+   ```
+   <?xml version='1.0' ?>
+   <launch>
+   
+       <!-- Launch the pre-approach node -->
+       <node pkg="attach_shelf" exec="pre_approach_node" name="pre_approach_node">
+           <param name="obstacle" value="0.30" />
+           <param name="degrees" value="-90.0" />
+       </node>
+   </launch>
+   ```
+
+2. Node class constructor declares the parameters by name and gets their values. Now ROS2 knows about them
+   ```
+   // Parameter: obstacle
+   auto param_desc = rcl_interfaces::msg::ParameterDescriptor{};
+   param_desc.description = "Sets the distance (in m) from the wall at which the robot should stop to reach the shelf.";
+   this->declare_parameter<std::double_t>("obstacle", 0.0, param_desc);
+   this->get_parameter("obstacle", obstacle_);
+
+   // Parameter: degrees
+   param_desc.description = "Sets the degrees (in deg) the robot should turn to face the shelf.";
+   this->declare_parameter<std::double_t>("degrees", 0.0, param_desc);
+   this->get_parameter("degrees", degrees_);
+   ```
+
+3. ROS2 reports the parameters for the node
+   ```
+   user:~/ros2_ws/src/parameter_tests/yaml$ ros2 param list | grep -A 7 pre_approach_node
+   /pre_approach_node:
+     degrees
+     obstacle
+     qos_overrides./parameter_events.publisher.depth
+     qos_overrides./parameter_events.publisher.durability
+     qos_overrides./parameter_events.publisher.history
+     qos_overrides./parameter_events.publisher.reliability
+     use_sim_time
+   ```
+
+4. To receive command-line arguments as in ros2 launch attach_shelf pre_approach.launch.xml obstacle:=0.3 degrees:=-90`, the XML launch file needs to delcare the arguments, as follows
+   ```
+   <?xml version='1.0' ?>
+   <launch>
+
+       <arg name="obstacle" default="0.3"/>
+       <arg name="degrees" default="-90.0"/>
+
+       <!-- Launch the pre-approach node -->
+       <node pkg="attach_shelf" exec="pre_approach_node" name="pre_approach_node">
+           <param name="obstacle" value="$(var obstacle)"/>
+           <param name="degrees" value="$(var degrees)"/>
+       </node>
+
+   </launch>
    ```

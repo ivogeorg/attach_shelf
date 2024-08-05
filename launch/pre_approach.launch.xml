@@ -1,10 +1,13 @@
 <?xml version='1.0' ?>
 <launch>
 
+    <arg name="obstacle" default="0.3"/>
+    <arg name="degrees" default="-90.0"/>
+
     <!-- Launch the pre-approach node -->
     <node pkg="attach_shelf" exec="pre_approach_node" name="pre_approach_node">
-        <param name="obstacle" value="0.30" />
-        <param name="degrees" value="-90.0" />
+        <param name="obstacle" value="$(var obstacle)"/>
+        <param name="degrees" value="$(var degrees)"/>
     </node>
 
 </launch>

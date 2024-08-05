@@ -18,8 +18,6 @@ using std::placeholders::_1;
 
 class RB1Approach : public rclcpp::Node {
 private:
-  double obstacle_;
-  double degrees_;
   sensor_msgs::msg::LaserScan last_laser_;
   nav_msgs::msg::Odometry odom_data_;
   rclcpp::TimerBase::SharedPtr timer_;
@@ -30,7 +28,7 @@ private:
   Motion motion_;
   const double LINEAR_BASE = 0.5;
   const double ANGULAR_BASE = 0.25;
-  const double LINEAR_TOLERANCE = 0.05;   // meters
+  const double LINEAR_TOLERANCE = 0.005;   // meters
   const double ANGULAR_TOLERANCE = 0.012; // about 2/3 of a deg
   const double ANGULAR_TOLERANCE_DEG = ANGULAR_TOLERANCE * RAD2DEG;
   bool moving_forward_;
@@ -43,11 +41,16 @@ private:
   double angle_increment, range_min;
   int front;
 
+  // Arguments/parameters
+  double obstacle_;
+  double degrees_;
+
 public:
-  RB1Approach(double obstacle = 0.3, double degrees = -90.0)
-      : Node("rb1_pre_approach_node"), obstacle_{obstacle}, degrees_{degrees},
-        timer_{this->create_wall_timer(
-            100ms, std::bind(&RB1Approach::on_timer, this))},
+  RB1Approach()
+      : Node("rb1_pre_approach_node"), timer_{this->create_wall_timer(
+                                           100ms,
+                                           std::bind(&RB1Approach::on_timer,
+                                                     this))},
         vel_pub_{this->create_publisher<geometry_msgs::msg::Twist>(
             "/diffbot_base_controller/cmd_vel_unstamped", 1)},
         scan_sub_{this->create_subscription<sensor_msgs::msg::LaserScan>(
@@ -61,8 +64,22 @@ public:
     wait_for_laser_scan_publisher();
     wait_for_odometery_publisher();
 
-    // will there be last_laser_?
-    // parametrize_laser_scanner(last_laser_);
+    // Parameter: obstacle
+    auto param_desc = rcl_interfaces::msg::ParameterDescriptor{};
+    param_desc.description = "Sets the distance (in m) from the wall at which "
+                             "the robot should stop to reach the shelf.";
+    this->declare_parameter<std::double_t>("obstacle", 0.0, param_desc);
+    this->get_parameter("obstacle", obstacle_);
+    RCLCPP_INFO(this->get_logger(), "Parameter 'obstacle' value %f m",
+                obstacle_);
+
+    // Parameter: degrees
+    param_desc.description =
+        "Sets the degrees (in deg) the robot should turn to face the shelf.";
+    this->declare_parameter<std::double_t>("degrees", 0.0, param_desc);
+    this->get_parameter("degrees", degrees_);
+    RCLCPP_INFO(this->get_logger(), "Parameter 'degrees' value %f deg",
+                degrees_);
   }
 
   ~RB1Approach() = default;
@@ -73,7 +90,7 @@ private:
     // This is a fall-through loop, which sets the Twist
     // and publishes before exiting
     if (!have_odom_ || !have_scan_) {
-      RCLCPP_INFO(this->get_logger(), "Waiting for data publishers");
+      RCLCPP_INFO(this->get_logger(), "Waiting for data");
       return;
     }
 
@@ -148,7 +165,8 @@ private:
       RCLCPP_DEBUG(this->get_logger(), "Stopped");
       twist.linear.x = 0.0;
       twist.angular.z = 0.0;
-      // TODO: Cancel timer!
+      timer_->cancel();
+      RCLCPP_INFO(this->get_logger(), "Pre-approach completed");
       break;
     default:
       RCLCPP_DEBUG(this->get_logger(), "Stopped");
@@ -175,35 +193,6 @@ private:
   }
 
   void parametrize_laser_scanner(sensor_msgs::msg::LaserScan &scan_data) {
-    // angle_increment = scan_data.angle_increment;
-    // range_min = scan_data.range_min;
-
-    // // DEBUG
-    // RCLCPP_DEBUG(this->get_logger(), "angle_increment = %f",
-    // angle_increment);
-    // // end DEBUG
-
-    // int thirty_deg_indices = static_cast<int>((PI_ / 6.0) / angle_increment);
-
-    // // DEBUG
-    // RCLCPP_DEBUG(this->get_logger(), "thirty_deg_indices = %d",
-    //              thirty_deg_indices);
-    // // end DEBUG
-
-    // double front_center_double = PI_ / angle_increment;
-    // int front_center_ix = static_cast<int>(lround(front_center_double));
-    // front = front_center_ix;
-
-    // // DEBUG
-    // RCLCPP_DEBUG(this->get_logger(), "front_center_double = %f",
-    //              front_center_double);
-    // RCLCPP_DEBUG(this->get_logger(), "front_center_ix = %d",
-    // front_center_ix);
-    // // end DEBUG
-
-    // TODO: More parametrization for shelf legs
-    // robot_patrol/patrol_with_service.cpp (325)
-
     int size = static_cast<int>(scan_data.ranges.size());
     front = static_cast<int>(round(size / 2.0));
     RCLCPP_DEBUG(this->get_logger(), "front index = %d", front);
@@ -215,7 +204,6 @@ private:
     RCLCPP_INFO(this->get_logger(), "Laser scanner parametrized");
   }
 
-  // TODO: is this the correct algorithm?
   double front_obstacle_dist() {
     double front_dist = 0.0;
     for (int i = front - FRONT_FANOUT; i <= front + FRONT_FANOUT; ++i) {
@@ -285,8 +273,7 @@ int main(int argc, char **argv) {
       {RCUTILS_LOG_SEVERITY::RCUTILS_LOG_SEVERITY_INFO, "INFO"},
       {RCUTILS_LOG_SEVERITY::RCUTILS_LOG_SEVERITY_WARN, "WARN"},
       {RCUTILS_LOG_SEVERITY::RCUTILS_LOG_SEVERITY_ERROR, "ERROR"},
-      {RCUTILS_LOG_SEVERITY::RCUTILS_LOG_SEVERITY_FATAL, "FATAL"}
-  };
+      {RCUTILS_LOG_SEVERITY::RCUTILS_LOG_SEVERITY_FATAL, "FATAL"}};
   int level = RCUTILS_LOG_SEVERITY::RCUTILS_LOG_SEVERITY_INFO;
   if (rcutils_logging_set_logger_level(logger.get_name(), level) !=
       RCUTILS_RET_OK) {
@@ -304,5 +291,3 @@ int main(int argc, char **argv) {
 
   return 0;
 }
-
-// ros2 launch attach_shelf pre_approach.launch.xml obstacle:=0.3 degrees:=-90
