@@ -25,12 +25,10 @@ An RB1 robot in a simulated warehouse world moves forward, turns, detects a shel
 
 ##### 2. Task 2 - Final approach
 
-**TODO:**
-1. ~In `attach_to_shelf.launch.py` launch `approach_service.launch.py` and `pre_approach_v2.launch.py`.~  
-2. ~In `pre_approach_v2.cpp`, when the pre-approach is completed, using the value of the `final_approach` argument, send a request to service `/approach_shelf` and report the response.~
-3. In `approach_service_server.cpp`:
-   1. Add all the `/scan` subscriber functionality that is already there in `pre_approach_v2.cpp`.
-   2. ~For starters, report the value of the request and return `false` in the response.~
+
+
+**TODO**  
+
 
 
 #### Implementation notes*
