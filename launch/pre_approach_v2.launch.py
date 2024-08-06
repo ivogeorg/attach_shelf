@@ -13,9 +13,14 @@ def generate_launch_description():
     degrees_arg = DeclareLaunchArgument(
         "degrees", default_value="-90.0"
     )
+    final_approach_arg = DeclareLaunchArgument(
+        "final_approach", default_value="false"
+    )
+
 
     obstacle_f = LaunchConfiguration('obstacle')
     degrees_f = LaunchConfiguration('degrees')
+    final_approach_f = LaunchConfiguration('final_approach')
 
     pre_approach_node = Node(
         package='attach_shelf',
@@ -25,7 +30,7 @@ def generate_launch_description():
         emulate_tty=True,
         arguments=["-obstacle", obstacle_f,
                    "-degrees", degrees_f,
-                   ]
+                   "-final_approach", final_approach_f,]
     )
 
     # create and return launch description object
@@ -33,6 +38,7 @@ def generate_launch_description():
         [
             obstacle_arg,
             degrees_arg,
+            final_approach_arg,
             pre_approach_node
         ]
     )

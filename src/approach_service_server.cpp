@@ -1,6 +1,3 @@
-#include <ios>
-#include <sstream>
-
 #include "attach_shelf/srv/go_to_loading.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "nav_msgs/msg/odometry.hpp"
@@ -26,7 +23,6 @@ using std::placeholders::_2;
 class ApproachServiceServer : public rclcpp::Node {
 private:
   rclcpp::Service<GoToLoading>::SharedPtr srv_;
-  bool final_approach_;
 
 public:
   ApproachServiceServer(int argc, char **argv);
@@ -41,14 +37,7 @@ ApproachServiceServer::ApproachServiceServer(int argc, char **argv)
     : Node("approach_service_server_node"),
       srv_{create_service<GoToLoading>(
           "approach_shelf",
-          std::bind(&ApproachServiceServer::service_callback, this, _1, _2))},
-      final_approach_{false} {
-
-  // Argument: final_approach
-  std::istringstream(argv[2]) >> std::boolalpha >> final_approach_;
-  RCLCPP_INFO(this->get_logger(), "Argument 'final_approach' value '%s'",
-              final_approach_ ? "true" : "false");
-}
+          std::bind(&ApproachServiceServer::service_callback, this, _1, _2))} {}
 
 void ApproachServiceServer::service_callback(
     const std::shared_ptr<GoToLoading::Request> request,
@@ -58,8 +47,6 @@ int main(int argc, char **argv) {
   rclcpp::init(argc, argv);
 
   auto node = std::make_shared<ApproachServiceServer>(argc, argv);
-
-  //   auto logger = rclcpp::get_logger("pre_approach_node_v2");
   auto logger = rclcpp::get_logger(node->get_name());
 
   // Set the log level

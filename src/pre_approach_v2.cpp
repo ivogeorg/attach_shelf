@@ -1,7 +1,10 @@
 #include <chrono>
 #include <functional>
 #include <string>
+#include <ios>
+#include <sstream>
 
+#include "attach_shelf/srv/go_to_loading.hpp"
 #include "geometry_msgs/msg/detail/twist__struct.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "nav_msgs/msg/odometry.hpp"
@@ -15,6 +18,7 @@
 
 using namespace std::chrono_literals;
 using std::placeholders::_1;
+using GoToLoading = attach_shelf::srv::GoToLoading;
 
 class RB1Approach : public rclcpp::Node {
 private:
@@ -24,8 +28,11 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr vel_pub_;
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+  rclcpp::Client<GoToLoading>::SharedPtr client_;
+
   enum class Motion { FORWARD, TURN, STOP };
   Motion motion_;
+  
   const double LINEAR_BASE = 0.5;
   const double ANGULAR_BASE = 0.25;
   const double LINEAR_TOLERANCE = 0.005;  // meters
@@ -44,6 +51,7 @@ private:
   // Arguments/parameters
   double obstacle_;
   double degrees_;
+  bool final_approach_;
 
 public:
   RB1Approach(int argc, char **argv);
@@ -96,14 +104,11 @@ RB1Approach::RB1Approach(int argc, char **argv)
           "scan", 10, std::bind(&RB1Approach::laser_scan_callback, this, _1))},
       odom_sub_{this->create_subscription<nav_msgs::msg::Odometry>(
           "odom", 10, std::bind(&RB1Approach::odometry_callback, this, _1))},
+          client_{this->create_client<GoToLoading>("approach_shelf")},
       motion_{Motion::FORWARD}, moving_forward_{true}, turning_{false},
       have_odom_{false}, have_scan_{false}, laser_scanner_parametrized_{false} {
   wait_for_laser_scan_publisher();
   wait_for_odometery_publisher();
-
-  // TODO: Provide for any order of specification
-  //       by reading the leading parameter names
-  //       and matching the names with the values
 
   // Argument: obstacle
   obstacle_ = std::stof(argv[2]);
@@ -112,6 +117,12 @@ RB1Approach::RB1Approach(int argc, char **argv)
   // Argument: degrees
   degrees_ = std::stof(argv[4]);
   RCLCPP_INFO(this->get_logger(), "Argument 'degrees' value %f deg", degrees_);
+
+  // Argument: final_approach
+  std::istringstream(argv[6]) >> std::boolalpha >> final_approach_;
+  RCLCPP_INFO(this->get_logger(), "Argument 'final_approach' value '%s'",
+              final_approach_ ? "true" : "false");
+
 }
 
 void RB1Approach::on_timer() {
@@ -197,6 +208,7 @@ void RB1Approach::on_timer() {
     timer_->cancel();
 
     // TODO: call /approach_shelf service here
+    //       need the final_approach argument, too
 
     RCLCPP_INFO(this->get_logger(), "Pre-approach completed");
     break;
@@ -268,8 +280,6 @@ int main(int argc, char **argv) {
   rclcpp::init(argc, argv);
 
   auto node = std::make_shared<RB1Approach>(argc, argv);
-
-  //   auto logger = rclcpp::get_logger("pre_approach_node_v2");
   auto logger = rclcpp::get_logger(node->get_name());
 
   // Set the log level

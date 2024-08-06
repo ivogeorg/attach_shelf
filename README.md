@@ -23,6 +23,16 @@ An RB1 robot in a simulated warehouse world moves forward, turns, detects a shel
    | --- | --- |
    | ![Pre-approach in Gazebo](assets/subm_pre_approach_gazebo.png) | ![Pre-approach in Rviz2](assets/subm_pre_approach_rviz2.png) |
 
+##### 2. Task 2 - Final approach
+
+**TODO:**
+1. In `attach_to_shelf.launch.py` launch `approach_service.launch.py` and `pre_approach_v2.launch.py`.  
+2. In `pre_approach_v2.cpp`, when the pre-approach is completed, using the value of the `final_approach` argument, send a request to service `/approach_shelf` and report the response.
+3. In `approach_service_server.cpp`:
+   1. Add all the `/scan` subscriber functionality that is already there in `pre_approach_v2.cpp`.
+   2. For starters, report the value of the request and return `false` in the response.
+
+
 #### Implementation notes*
 
 _*Cumulative for both Task 1 and Task 2._  
@@ -128,7 +138,7 @@ Need to add a frame in the middle of the reflective plates of the shelf.
    }
    ```
 
-##### 7. Using parameters from launch file
+##### 7. Using parameters and arguments from launch file
 
 1. Launch file declares parameters by name and default value, which is not enough by itself. See next step
    ```
