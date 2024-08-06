@@ -1,8 +1,8 @@
 #include <chrono>
 #include <functional>
-#include <string>
 #include <ios>
 #include <sstream>
+#include <string>
 
 #include "attach_shelf/srv/go_to_loading.hpp"
 #include "geometry_msgs/msg/detail/twist__struct.hpp"
@@ -32,7 +32,7 @@ private:
 
   enum class Motion { FORWARD, TURN, STOP };
   Motion motion_;
-  
+
   const double LINEAR_BASE = 0.5;
   const double ANGULAR_BASE = 0.25;
   const double LINEAR_TOLERANCE = 0.005;  // meters
@@ -63,6 +63,7 @@ private:
   double front_obstacle_dist();
   void wait_for_laser_scan_publisher();
   void wait_for_odometery_publisher();
+  void service_response_callback(rclcpp::Client<GoToLoading>::SharedFuture future);
 
   inline void
   laser_scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
@@ -104,7 +105,7 @@ RB1Approach::RB1Approach(int argc, char **argv)
           "scan", 10, std::bind(&RB1Approach::laser_scan_callback, this, _1))},
       odom_sub_{this->create_subscription<nav_msgs::msg::Odometry>(
           "odom", 10, std::bind(&RB1Approach::odometry_callback, this, _1))},
-          client_{this->create_client<GoToLoading>("approach_shelf")},
+      client_{this->create_client<GoToLoading>("approach_shelf")},
       motion_{Motion::FORWARD}, moving_forward_{true}, turning_{false},
       have_odom_{false}, have_scan_{false}, laser_scanner_parametrized_{false} {
   wait_for_laser_scan_publisher();
@@ -122,7 +123,6 @@ RB1Approach::RB1Approach(int argc, char **argv)
   std::istringstream(argv[6]) >> std::boolalpha >> final_approach_;
   RCLCPP_INFO(this->get_logger(), "Argument 'final_approach' value '%s'",
               final_approach_ ? "true" : "false");
-
 }
 
 void RB1Approach::on_timer() {
@@ -202,18 +202,28 @@ void RB1Approach::on_timer() {
     }
     break;
   case Motion::STOP:
-    RCLCPP_DEBUG(this->get_logger(), "Stopped");
-    twist.linear.x = 0.0;
-    twist.angular.z = 0.0;
-    timer_->cancel();
-
-    // TODO: call /approach_shelf service here
-    //       need the final_approach argument, too
-
     RCLCPP_INFO(this->get_logger(), "Pre-approach completed");
+    // If robot not stopped, stop it, else call service
+    if (abs(twist.linear.x) > 0.0 || abs(twist.angular.z) > 0.0) {
+      twist.linear.x = 0.0;
+      twist.angular.z = 0.0;
+    } else {
+      RCLCPP_DEBUG(this->get_logger(), "Robot stopped");
+      timer_->cancel(); // timer not needed
+
+      auto request = std::make_shared<GoToLoading::Request>();
+      request->attach_to_shelf = final_approach_;
+
+      auto result_future = client_->async_send_request(
+          request, std::bind(&RB1Approach::service_response_callback, this,
+                             std::placeholders::_1));
+      RCLCPP_DEBUG(this->get_logger(),
+                   "Requested final approach to be completed: '%s",
+                   final_approach_ ? "yes" : "no");
+    }
     break;
   default:
-    RCLCPP_DEBUG(this->get_logger(), "Stopped");
+    RCLCPP_WARN(this->get_logger(), "Unrecognized motion. Stopping robot");
     twist.linear.x = 0.0;
     twist.angular.z = 0.0;
   }
@@ -274,6 +284,21 @@ void RB1Approach::wait_for_odometery_publisher() {
                  "'odom' topic publisher not available, waiting...");
   }
   RCLCPP_INFO(this->get_logger(), "'odom' topic publisher acquired");
+}
+
+void RB1Approach::service_response_callback(
+    rclcpp::Client<GoToLoading>::SharedFuture future) {
+  auto status = future.wait_for(1s);
+  bool final_approach_complete = false;
+  if (status != std::future_status::ready) {
+    RCLCPP_INFO(this->get_logger(), "Service '/approach_shelf' in progress...");
+  } else {
+    RCLCPP_DEBUG(this->get_logger(), "Service '/approach_shelf' response");
+    auto result = future.get();
+    final_approach_complete = result->complete;
+    RCLCPP_INFO(this->get_logger(), "Final approach complete: '%s'",
+                final_approach_complete ? "true" : "false");
+  }
 }
 
 int main(int argc, char **argv) {

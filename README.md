@@ -27,10 +27,10 @@ An RB1 robot in a simulated warehouse world moves forward, turns, detects a shel
 
 **TODO:**
 1. ~In `attach_to_shelf.launch.py` launch `approach_service.launch.py` and `pre_approach_v2.launch.py`.~  
-2. In `pre_approach_v2.cpp`, when the pre-approach is completed, using the value of the `final_approach` argument, send a request to service `/approach_shelf` and report the response.
+2. ~In `pre_approach_v2.cpp`, when the pre-approach is completed, using the value of the `final_approach` argument, send a request to service `/approach_shelf` and report the response.~
 3. In `approach_service_server.cpp`:
    1. Add all the `/scan` subscriber functionality that is already there in `pre_approach_v2.cpp`.
-   2. For starters, report the value of the request and return `false` in the response.
+   2. ~For starters, report the value of the request and return `false` in the response.~
 
 
 #### Implementation notes*
@@ -52,10 +52,10 @@ _Optional, but good practice with entity states._
 2. Subscriber to `/odom` (`nav_msgs/msg/Odometry`).
 3. Publisher to `/diffbot_base_controller/cmd_vel_unstamped` (`geometry_msgs/msg/Twist`).
 4. Timer for velocity publisher.
-5. Client to service `/approach_shelf` (custom `GoToLanding.srv`).  
-6. Publisher to `/elevator_up` (`std_msgs/msg/Empty`).  
-7. Publisher to `/elevator_down` (`std_msgs/msg/Empty`).  
-8. Service server and client.
+5. Server for service `/approach_shelf` (custom `GoToLanding.srv`).
+6. Client to service `/approach_shelf` (custom `GoToLanding.srv`).  
+7. Publisher to `/elevator_up` (`std_msgs/msg/Empty`).  
+8. Publisher to `/elevator_down` (`std_msgs/msg/Empty`).  
 9. Transform listener.
 
 ##### 3. Adding a frame
