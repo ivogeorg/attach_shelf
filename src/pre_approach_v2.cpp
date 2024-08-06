@@ -293,7 +293,7 @@ void RB1Approach::service_response_callback(
   if (status != std::future_status::ready) {
     RCLCPP_INFO(this->get_logger(), "Service '/approach_shelf' in progress...");
   } else {
-    RCLCPP_DEBUG(this->get_logger(), "Service '/approach_shelf' response");
+    RCLCPP_DEBUG(this->get_logger(), "Service '/approach_shelf' response received");
     auto result = future.get();
     final_approach_complete = result->complete;
     RCLCPP_INFO(this->get_logger(), "Final approach complete: '%s'",

@@ -1,9 +1,13 @@
+#include <chrono>
+
 #include "attach_shelf/srv/go_to_loading.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp/utilities.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
 
+using namespace std::chrono_literals;
 using GoToLoading = attach_shelf::srv::GoToLoading;
 using LaserScan = sensor_msgs::msg::LaserScan;
 using std::placeholders::_1;
@@ -12,12 +16,22 @@ using std::placeholders::_2;
 class ApproachServiceServer : public rclcpp::Node {
 private:
   rclcpp::Service<GoToLoading>::SharedPtr srv_;
+  rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
+
+  bool have_scan_;
+  sensor_msgs::msg::LaserScan last_laser_;
 
 public:
   ApproachServiceServer(int argc, char **argv);
   ~ApproachServiceServer() = default;
 
 private:
+  inline void
+  laser_scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
+    last_laser_ = *msg;
+    have_scan_ = true;
+  }
+
   void service_callback(const std::shared_ptr<GoToLoading::Request> request,
                         const std::shared_ptr<GoToLoading::Response> response);
 };
@@ -26,7 +40,11 @@ ApproachServiceServer::ApproachServiceServer(int argc, char **argv)
     : Node("approach_service_server_node"),
       srv_{create_service<GoToLoading>(
           "approach_shelf",
-          std::bind(&ApproachServiceServer::service_callback, this, _1, _2))} {}
+          std::bind(&ApproachServiceServer::service_callback, this, _1, _2))},
+      scan_sub_{this->create_subscription<sensor_msgs::msg::LaserScan>(
+          "scan", 10,
+          std::bind(&ApproachServiceServer::laser_scan_callback, this, _1))},
+      have_scan_{false} {}
 
 void ApproachServiceServer::service_callback(
     const std::shared_ptr<GoToLoading::Request> request,
@@ -34,16 +52,20 @@ void ApproachServiceServer::service_callback(
   RCLCPP_INFO(this->get_logger(), "Recived request with attach_to_service='%s'",
               request->attach_to_shelf ? "true" : "false");
 
+  while (!have_scan_) {
+    RCLCPP_INFO(this->get_logger(), "Waiting for data");
+    rclcpp::sleep_for(100ms);
+  }
+
   // TODO: implement the service
 
   // Functionality:
-  
+
   // 1. Detect reflective plates.
   // 2. Add a `cart_frame` TF frame in between them.
   // 3. Move the robot to `cart_frame` using a TransformListener.
   // 4. Move the robot 30 cm forward and stop.
   // 5. Lift the elevator to attach to the cart/shelf.
-
 
   response->complete = false;
 }

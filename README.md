@@ -37,9 +37,9 @@ An RB1 robot in a simulated warehouse world moves forward, turns, detects a shel
 
 _*Cumulative for both Task 1 and Task 2._  
 
-##### 1. Put robot in intial state
+##### 1. Put robot back in initial state in Gazebo w/o restart
 
-_Optional, but good practice with entity states._  
+_Optional_  
 
 1. Can use the `/demo/set_entity_state` service to put the robot in the initial position for repeated testing.  
 2. The service is of type `gazebo_msgs/srv/SetEntityState`.
