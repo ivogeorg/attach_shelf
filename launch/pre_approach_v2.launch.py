@@ -17,7 +17,6 @@ def generate_launch_description():
         "final_approach", default_value="false"
     )
 
-
     obstacle_f = LaunchConfiguration('obstacle')
     degrees_f = LaunchConfiguration('degrees')
     final_approach_f = LaunchConfiguration('final_approach')

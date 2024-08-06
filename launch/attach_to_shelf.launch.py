@@ -1,27 +1,62 @@
 from launch import LaunchDescription
-from launch_ros.actions import Node
+from launch.actions import DeclareLaunchArgument
+from launch.actions import IncludeLaunchDescription
+
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+
+from launch.substitutions import LaunchConfiguration
+from launch.substitutions import PathJoinSubstitution
+from launch.substitutions import TextSubstitution
+
+from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
+
+    # Package
+    ros2_pkg = "attach_shelf"
+
+    # DeclareLaunchArgument
+    obstacle_arg = DeclareLaunchArgument("obstacle", default_value=TextSubstitution(text="0.30"))
+    degrees_arg = DeclareLaunchArgument("degrees", default_value=TextSubstitution(text="-90.0"))
+    final_approach_arg = DeclareLaunchArgument("final_approach", default_value=TextSubstitution(text="false"))
+
+    # LaunchConfiguration
+    obstacle_f = LaunchConfiguration('obstacle')
+    degrees_f = LaunchConfiguration('degrees')
+    final_approach_f = LaunchConfiguration('final_approach')
+
+    # IncludeLaunchDescription
+    approach_service_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([
+            PathJoinSubstitution([
+                FindPackageShare(ros2_pkg),
+                'launch',
+                'approach_service.launch.py'
+            ])
+        ])
+    )
+    pre_approach_v2_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([
+            PathJoinSubstitution([
+                FindPackageShare(ros2_pkg),
+                'launch',
+                'pre_approach_v2.launch.py'
+            ])  
+        ]),
+        launch_arguments= {
+            'obstacle' : obstacle_f,
+            'degrees' : degrees_f,
+            'final_approach' : final_approach_f
+        }.items()
+    )
+
+    # LaunchDescription
     return LaunchDescription([
-        Node (
-            package='attach_shelf',
-            executable='approach_shelf_service_server_node',
-            output='screen',
-            emulate_tty=True,
-            parameters=[
-                {'final_approach':True}
-            ]
-        ),
-        Node (
-            package='attach_shelf',
-            executable='pre_approach_v2_node',
-            output='screen',
-            emulate_tty=True,
-            parameters=[
-                {'obstacle':0.3},
-                {'degrees':-90.0}
-            ]
-        ),
+        obstacle_arg,
+        degrees_arg,
+        final_approach_arg,
+        approach_service_launch,
+        pre_approach_v2_launch
     ])
 
 
