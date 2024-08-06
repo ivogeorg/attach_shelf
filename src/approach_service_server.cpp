@@ -4,17 +4,6 @@
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
 
-// https://github.com/ivogeorg/robot_patrol/blob/main/src/direction_service.cpp
-// #include "robot_patrol/srv/get_direction.hpp"
-// using GetDirection = robot_patrol::srv::GetDirection;
-
-// Functionality:
-// 1. Detect reflective plates.
-// 2. Add a `cart_frame` TF frame in between them.
-// 3. Move the robot to `cart_frame` using a TransformListener.
-// 4. Move the robot 30 cm forward and stop.
-// 5. Lift the elevator to attach to the cart/shelf.
-
 using GoToLoading = attach_shelf::srv::GoToLoading;
 using LaserScan = sensor_msgs::msg::LaserScan;
 using std::placeholders::_1;
@@ -41,7 +30,23 @@ ApproachServiceServer::ApproachServiceServer(int argc, char **argv)
 
 void ApproachServiceServer::service_callback(
     const std::shared_ptr<GoToLoading::Request> request,
-    const std::shared_ptr<GoToLoading::Response> response) {}
+    const std::shared_ptr<GoToLoading::Response> response) {
+  RCLCPP_INFO(this->get_logger(), "Recived request with attach_to_service='%s'",
+              request->attach_to_shelf ? "true" : "false");
+
+  // TODO: implement the service
+
+  // Functionality:
+  
+  // 1. Detect reflective plates.
+  // 2. Add a `cart_frame` TF frame in between them.
+  // 3. Move the robot to `cart_frame` using a TransformListener.
+  // 4. Move the robot 30 cm forward and stop.
+  // 5. Lift the elevator to attach to the cart/shelf.
+
+
+  response->complete = false;
+}
 
 int main(int argc, char **argv) {
   rclcpp::init(argc, argv);
