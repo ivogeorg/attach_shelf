@@ -34,7 +34,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 add_executable(pre_approach_node src/pre_approach.cpp)
 ament_target_dependencies(pre_approach_node rclcpp geometry_msgs sensor_msgs nav_msgs)
 
-add_executable(pre_approach_v2_node src/pre_approach.cpp)
+add_executable(pre_approach_v2_node src/pre_approach_v2.cpp)
 ament_target_dependencies(pre_approach_v2_node rclcpp geometry_msgs sensor_msgs nav_msgs)
 
 add_executable(laser_scanner_poker_node src/laser_scanner_poker.cpp)

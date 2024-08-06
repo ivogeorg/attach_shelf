@@ -84,7 +84,7 @@ Need to add a frame in the middle of the reflective plates of the shelf.
    range_min: 0.05999999865889549
    range_max: 20.0
    ```
-2. Thanks to the new [`LaserScannerPoker`](src/laser_scanner_poker.cpp):
+2. Thanks to the new [`LaserScannerPoker`](src/laser_scanner_poker.cpp) for reporting the parameters:
    ```
    [laser_scanner_poker_node-1] [INFO] [1722708445.226614735] [laser_scanner_poker_node]: angle_min = -2.356200 rad
    [laser_scanner_poker_node-1] [INFO] [1722708445.226731971] [laser_scanner_poker_node]: angle_max = 2.356200 rad
@@ -186,3 +186,38 @@ Need to add a frame in the middle of the reflective plates of the shelf.
 
    </launch>
    ```
+
+5. Launch arguments delcared in the Python launch file are sent through the `argv` array and can be extracted in a straightforward manner as, for example, `turning_speed = std::stof(argv[2]);`. The following allows the arguments to be specified in any order while passing it on to the executable in the the order declared, making the order predictable for the source code.
+```
+def generate_launch_description():
+
+    obstacle_arg = DeclareLaunchArgument(
+        "obstacle", default_value="0.30"
+    )
+    degrees_arg = DeclareLaunchArgument(
+        "degrees", default_value="-90.0"
+    )
+
+    obstacle_f = LaunchConfiguration('obstacle')
+    degrees_f = LaunchConfiguration('degrees')
+
+    pre_approach_node = Node(
+        package='attach_shelf',
+        executable='pre_approach_v2_node',
+        output='screen',
+        name='pre_approach_v2_node',
+        emulate_tty=True,
+        arguments=["-obstacle", obstacle_f,
+                   "-degrees", degrees_f,
+                   ]
+    )
+
+    # create and return launch description object
+    return LaunchDescription(
+        [
+            obstacle_arg,
+            degrees_arg,
+            pre_approach_node
+        ]
+    )
+    ```
