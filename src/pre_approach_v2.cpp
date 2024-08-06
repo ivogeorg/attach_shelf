@@ -195,6 +195,9 @@ void RB1Approach::on_timer() {
     twist.linear.x = 0.0;
     twist.angular.z = 0.0;
     timer_->cancel();
+
+    // TODO: call /approach_shelf service here
+
     RCLCPP_INFO(this->get_logger(), "Pre-approach completed");
     break;
   default:

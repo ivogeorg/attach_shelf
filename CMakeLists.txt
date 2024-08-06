@@ -51,6 +51,7 @@ rosidl_get_typesupport_target(typesupport_target ${PROJECT_NAME} "rosidl_typesup
 
 # Link against the generated interface library
 # NOTE: CMake, no keywords (PRIVATE, PUBLIC) or all keywords (can't mix)
+target_link_libraries(pre_approach_v2_node ${typesupport_target})
 target_link_libraries(approach_shelf_service_server_node ${typesupport_target})
 
 install(TARGETS
