@@ -94,13 +94,24 @@ Need to add a frame in the middle of the reflective plates of the shelf.
 | --- | --- |
 | ![Facing shelf Gazebo](assets/facing_shelf_gazebo.png) | ![Facing shelf Rviz2](assets/facing_shelf_rviz2.png) |   
 
-###### 3.1. Brainstorming 
+###### 3.1. Brainstorming
 
 Briefly, after the RB1 robot has completed the pre-approach, has faced the crate/shelf, and has identified the two reflective plates, this TF needs to be added right in between the reflective plates. Questions:
 1. In the image showing the new TF in Rviz2, `cart_frame` seems to be defined relative to `robot_front_laser_base_link`. The arrow points from `cart_frame` to `robot_front_laser_base_link`. If the robot moves, won't `cart_frame` also move?
 2. If we use a `TransformBroadcaster` instead of a `StaticTransformBroadcaster` to define `cart_frame` relative to `robot_front_laser_base_link`, won't it still move to maintain the definition relative to `robot_front_laser_base_link`?
 3. Shouldn't `cart_frame`, which we need to stay in place to be used for moving the robot toward it, be defined in a transform from `odom` (or whatever the root link in the TF tree is)?
 4. If `cart_frame` will move with `robot_front_laser_base_link`, do we have to recalculate the point and modify the TF broadcast? That seems to be counterintuitive, not to mention difficult, because the reflective plates will disappear from "laser view" as the robot approaches the crate/shelf.
+
+###### 3.2 Brainstorming
+
+1. `cart_frame` should be defined as a TF relative to `odom`.
+2. Solve the SAS triangle. Get:
+   1. The `x` and `y` coordinates of `cart_frame` relative to `robot_front_laser_base_link`.
+   2. Get the angle of `cart_frame` from `robot_front_laser_base_link`.
+3. Use a `TransformBroadcaster` to publish `cart_frame` relative to `robot_front_laser_base_link` once.
+4. Use `tf_buffer.lookupTransform` between `odom` and `cart_frame`.
+5. Use a `StaticTransformBroadcaster` to publish the TF between `odom` and `cart_frame`. By default, this is published once. 
+6. Proceed with the final approach.
 
 ##### 4. `tf2_ros::TransformListener` for precision movement
 

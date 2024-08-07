@@ -90,6 +90,15 @@ void ApproachServiceServer::service_callback(
   RCLCPP_DEBUG(this->get_logger(), "left_ix = %d, right_ix = %d", left_ix,
                right_ix);
 
+  // SAS triangle
+  double left_side, right_side, sas_angle;
+  left_side = last_laser_.ranges[left_ix];
+  right_side = last_laser_.ranges[right_ix];
+  sas_angle = (right_ix - left_ix) * last_laser_.angle_increment;
+
+  RCLCPP_DEBUG(this->get_logger(), "left_side = %f, right_side = %f, angle = %f", left_side,
+               right_side, sas_angle);
+
   // 2. Add a `cart_frame` TF frame in between them.
   //    Solving the SAS triangle, get the distance and angle to the midpoint
   //    Calculate the transform from `robot_front_laser_base_link`
