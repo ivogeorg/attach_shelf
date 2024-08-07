@@ -81,6 +81,8 @@ void ApproachServiceServer::service_callback(
   RCLCPP_DEBUG(this->get_logger(), "Segmented reflective points into %d sets",
                static_cast<int>(reflective_vector_set.size()));
 
+  // the segments are sorted, externally and internally
+  // pick the two innermost points, one from each set
   int left_ix, right_ix;
   left_ix = reflective_vector_set[0][reflective_vector_set[0].size() - 1];
   right_ix = reflective_vector_set[1][0];
@@ -89,6 +91,10 @@ void ApproachServiceServer::service_callback(
                right_ix);
 
   // 2. Add a `cart_frame` TF frame in between them.
+  //    Solving the SAS triangle, get the distance and angle to the midpoint
+  //    Calculate the transform from `robot_front_laser_base_link`
+  //    Use a (non-static) TransformPublisher to publish `cart_frame`
+  
   // 3. Move the robot to `cart_frame` using a TransformListener.
   // 4. Move the robot 30 cm forward and stop.
   // 5. Lift the elevator to attach to the cart/shelf.

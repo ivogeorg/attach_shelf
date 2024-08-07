@@ -74,6 +74,19 @@ Need to add a frame in the middle of the reflective plates of the shelf.
    5. Move the robot forward for 30 more cm. This can be done with another frame or with `Odomerty` data.
 3. The goal is:
    ![Cart frame added](assets/cart_frame.png)   
+4. The `cart_frame` has to be relative to the root of the world, otherwise it will move with the robot. _Won't it?_  
+
+| Gazebo | Rviz2 |
+| --- | --- |
+| ![Facing shelf Gazebo](assets/facing_shelf_gazebo.png) | ![Facing shelf Rviz2](assets/facing_shelf_rviz2.png) |   
+
+###### 3.1. Brainstorming 
+
+Briefly, after the RB1 robot has completed the pre-approach, has faced the crate/shelf, and has identified the two reflective plates, this TF needs to be added right in between the reflective plates. Questions:
+1. In the image showing the new TF in Rviz2, `cart_frame` seems to be defined relative to `robot_front_laser_base_link`. The arrow points from `cart_frame` to `robot_front_laser_base_link`. If the robot moves, won't `cart_frame` also move?
+2. If we use a `TransformBroadcaster` instead of a `StaticTransformBroadcaster` to define `cart_frame` relative to `robot_front_laser_base_link`, won't it still move to maintain the definition relative to `robot_front_laser_base_link`?
+3. Shouldn't `cart_frame`, which we need to stay in place to be used for moving the robot toward it, be defined in a transform from `odom` (or whatever the root link in the TF tree is)?
+4. If `cart_frame` will move with `robot_front_laser_base_link`, do we have to recalculate the point and modify the TF broadcast? That seems to be counterintuitive, not to mention difficult, because the reflective plates will disappear from "laser view" as the robot approaches the crate/shelf.
 
 ##### 4. `tf2_ros::TransformListener` for precision movement
 
