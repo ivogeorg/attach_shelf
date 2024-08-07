@@ -74,7 +74,21 @@ Need to add a frame in the middle of the reflective plates of the shelf.
    5. Move the robot forward for 30 more cm. This can be done with another frame or with `Odomerty` data.
 3. The goal is:
    ![Cart frame added](assets/cart_frame.png)   
-4. The `cart_frame` has to be relative to the root of the world, otherwise it will move with the robot. _Won't it?_  
+4. The `cart_frame` has to be relative to the root of the world, in this case `odom`, otherwise it will move with the robot.  
+5. The world coordinates of `cart_fram` can be calculated by "adding" a transform from a known transform, say, between `odom` and `robot_front_laser_base_link`, while the robot is stopped. Here is the latter TF:
+   ```
+   At time 1277.200000000
+   - Translation: [5.777, -0.147, 0.235]
+   - Rotation: in Quaternion [-0.699, 0.715, -0.000, -0.000]
+   - Rotation: in RPY (radian) [-3.142, -0.000, -1.592]
+   - Rotation: in RPY (degree) [-180.000, -0.000, -91.230]
+   - Matrix:
+    -0.021 -1.000 -0.000  5.777
+    -1.000  0.021 -0.000 -0.147
+     0.000 -0.000 -1.000  0.235
+     0.000  0.000  0.000  1.000
+   ```  
+6. `cart_frame` will only have an `x` and a `y` component (and possibly a yaw) relative to `robot_front_laser_base_link`. So, these are two transforms, which need to be combined, by matrix multiplication (except we don't have a matrix for the latter) or some other way. _How to combine?_
 
 | Gazebo | Rviz2 |
 | --- | --- |
