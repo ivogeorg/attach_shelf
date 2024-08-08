@@ -9,6 +9,13 @@
 #include "rclcpp/utilities.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
 
+#include "geometry_msgs/msg/transform_stamped.hpp"
+#include "tf2/exceptions.h"
+#include "tf2_ros/transform_listener.h"
+#include "tf2_ros/buffer.h"
+#include "tf2_ros/transform_broadcaster.h"
+
+
 using namespace std::chrono_literals;
 using GoToLoading = attach_shelf::srv::GoToLoading;
 using LaserScan = sensor_msgs::msg::LaserScan;
@@ -98,6 +105,12 @@ void ApproachServiceServer::service_callback(
 
   RCLCPP_DEBUG(this->get_logger(), "left_side = %f, right_side = %f, angle = %f", left_side,
                right_side, sas_angle);
+
+  // some x and y from solved SAS triangle, likely both negative, say x=-0.15, y=-0.75
+  double x = -0.15, y = -0.75;
+
+  // get the transform `odom`->`robot_front_laser_base_link`
+
 
   // 2. Add a `cart_frame` TF frame in between them.
   //    Solving the SAS triangle, get the distance and angle to the midpoint
