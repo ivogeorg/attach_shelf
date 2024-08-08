@@ -1,5 +1,6 @@
 #include <functional>
 #include <string>
+#include <iostream>
 
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp/utilities.hpp"
@@ -64,6 +65,9 @@ void LaserScannerPoker::laser_scan_callback(
     RCLCPP_INFO(this->get_logger(), "ranges[size-1] = %f",
                 last_laser_.ranges[size - 1]);
 
+    // NOTE NOTE NOTE
+    // This scanner goes CW, so index 0 is at angle 135 degrees!!!
+
     /*
     [laser_scanner_poker_node-1] [INFO] [1722710149.280709048] [laser_scanner_poker_node]: angle_min = -2.356200 rad
 [laser_scanner_poker_node-1] [INFO] [1722710149.280871616] [laser_scanner_poker_node]: angle_max = 2.356200 rad
@@ -78,6 +82,10 @@ void LaserScannerPoker::laser_scan_callback(
 [laser_scanner_poker_node-1] [INFO] [1722710149.281006847] [laser_scanner_poker_node]: ranges[size-1] = 4.384594
 ^C[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
     */
+
+    for (int i = 0; i < size; ++i)
+        std::cout << i << ": " << last_laser_.ranges[i] << '\n';
+    std::cout << std::flush;
 
 
     done_ = true;

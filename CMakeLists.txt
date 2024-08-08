@@ -8,6 +8,7 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
@@ -44,7 +45,7 @@ add_executable(intensity_poker_node src/intensity_poker.cpp)
 ament_target_dependencies(intensity_poker_node rclcpp sensor_msgs)
 
 add_executable(approach_shelf_service_server_node src/approach_service_server.cpp)
-ament_target_dependencies(approach_shelf_service_server_node rclcpp geometry_msgs nav_msgs sensor_msgs)
+ament_target_dependencies(approach_shelf_service_server_node rclcpp geometry_msgs nav_msgs sensor_msgs tf2 tf2_ros)
 
 # Get the typesupport target name
 rosidl_get_typesupport_target(typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")

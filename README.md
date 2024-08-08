@@ -117,7 +117,7 @@ Briefly, after the RB1 robot has completed the pre-approach, has faced the crate
 
 **Note:** All in code. No hardcoding!  
 
-1. Solve the SAS triangle to get the `x` and `y` offsets between `robot_front_laser_base_link` and `cart_frame`. Call them `x_offset` and `y_offset`.
+1. Solve the SAS triangle to get the `x` and `y` offsets between `robot_front_laser_base_link` and `cart_frame`. Call them `x_offset` and `y_offset`. _**How to solve this to get the signs of `x_offset` and `y_offset` right regardless of the location in the world?**_
 1. Declare private `std::string source_frame_` and `std::string target_frame_`. They will serve as parameters for the `tf_buffer_.lookupTransform()`. Will require some `bool` vars to enforce the logic.
 2. Declare private `geometry_msgs::msg::TransformStamped odom_laser_t_`. It will hold the transform `odom` to `robot_front_laser_base_link` whic, when the robot has completed the pre-approach, will be used to define the tranform `odom_cart_` from `odom` to `cart_frame` by adding the offsets `x_offset` and `y_offset`. Then it will be zeroed out by assigning to a newly declared local variable.
 3. Declare private `geometry_msgs::msg::TransformStamped odom_cart_t_`. It will hold the transform `odom` to `cart_frame` to be used by TF to look up the tranform `laser_cart_t_`.
@@ -140,7 +140,7 @@ Briefly, after the RB1 robot has completed the pre-approach, has faced the crate
 
 ##### 5. Parametrizing the laser scanner
 
-1. This is a weird one!  
+1. This is a weird one!
    ```
    angle_min: -2.3561999797821045
    angle_max: 2.3561999797821045
@@ -150,7 +150,7 @@ Briefly, after the RB1 robot has completed the pre-approach, has faced the crate
    range_min: 0.05999999865889549
    range_max: 20.0
    ```
-2. Thanks to the new [`LaserScannerPoker`](src/laser_scanner_poker.cpp) for reporting the parameters:
+2. [`LaserScannerPoker`](src/laser_scanner_poker.cpp) for reporting the parameters:
    ```
    [laser_scanner_poker_node-1] [INFO] [1722708445.226614735] [laser_scanner_poker_node]: angle_min = -2.356200 rad
    [laser_scanner_poker_node-1] [INFO] [1722708445.226731971] [laser_scanner_poker_node]: angle_max = 2.356200 rad
@@ -159,6 +159,8 @@ Briefly, after the RB1 robot has completed the pre-approach, has faced the crate
    [laser_scanner_poker_node-1] [INFO] [1722708445.226761269] [laser_scanner_poker_node]: range_max = 20.000000 rad
    [laser_scanner_poker_node-1] [INFO] [1722708445.226769927] [laser_scanner_poker_node]: ranges size = 1081
    ```
+3. **NOTE:** Most importantly, it cycles CW so index 0 is at angle ~135 degrees, exactly the opposite of the standard direction and convention. See [data/full_scanner.txt](data/full_scanner.txt) for a single run with the robot having completed the pre-approach and facing the cart/shelf. See the `inf` runs when the scanner passes through the two doors.  
+   ![Full scan position](assets/full_scan_position.png)  
 
 ##### 6. Logging
 
