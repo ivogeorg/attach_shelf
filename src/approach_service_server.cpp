@@ -38,11 +38,12 @@ public:
 class ApproachServiceServer : public rclcpp::Node {
 private:
   rclcpp::CallbackGroup::SharedPtr cb_group_;
-  CustomSubscriptionOptions sub_options_;
+  CustomSubscriptionOptions topic_pub_sub_options_;
 
   rclcpp::Service<GoToLoading>::SharedPtr srv_;
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr vel_pub_;
 
   bool have_scan_;
   bool have_odom_;
@@ -71,6 +72,9 @@ private:
 
   std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
   rclcpp::TimerBase::SharedPtr broadcaster_timer_;
+
+  const double LINEAR_TOLERANCE = 0.03;  // m
+  const double ANGULAR_TOLERANCE = 0.01; // rad
 
 public:
   ApproachServiceServer();
@@ -101,7 +105,7 @@ ApproachServiceServer::ApproachServiceServer()
     : Node("approach_service_server_node"),
       cb_group_{
           this->create_callback_group(rclcpp::CallbackGroupType::Reentrant)},
-      sub_options_{cb_group_},
+      topic_pub_sub_options_{cb_group_},
       srv_{this->create_service<GoToLoading>(
           "approach_shelf",
           std::bind(&ApproachServiceServer::service_callback, this, _1, _2),
@@ -109,11 +113,13 @@ ApproachServiceServer::ApproachServiceServer()
       scan_sub_{this->create_subscription<sensor_msgs::msg::LaserScan>(
           "scan", 10,
           std::bind(&ApproachServiceServer::laser_scan_callback, this, _1),
-          sub_options_)},
+          topic_pub_sub_options_)},
       odom_sub_{this->create_subscription<nav_msgs::msg::Odometry>(
           "odom", 10,
           std::bind(&ApproachServiceServer::odometry_callback, this, _1),
-          sub_options_)},
+          topic_pub_sub_options_)},
+      vel_pub_{this->create_publisher<geometry_msgs::msg::Twist>(
+          "/diffbot_base_controller/cmd_vel_unstamped", 1)},
       have_scan_{false}, have_odom_{false}, odom_frame_{"odom"},
       laser_frame_{"robot_front_laser_base_link"}, cart_frame_{"cart_frame"},
       broadcast_odom_cart_{false}, listen_to_odom_laser_{false},
@@ -253,7 +259,16 @@ void ApproachServiceServer::service_callback(
   broadcast_odom_cart_ = true;
 
   // 3. Move the robot to `cart_frame` using a TransformListener.
+  rclcpp::sleep_for(3s); // TODO: fine tune or WaitSet?
+  listen_to_laser_cart_ = true;
+
+  while (listen_to_laser_cart_)
+    ;
+
+  listener_timer_->cancel();
+
   // 4. Move the robot 30 cm forward and stop.
+
   // 5. Lift the elevator to attach to the cart/shelf.
 
   response->complete = false;
@@ -294,21 +309,63 @@ void ApproachServiceServer::listener_cb() {
     // listen for TF `odom`->`robot_front_laser_base_link`
     RCLCPP_DEBUG(this->get_logger(),
                  "Listening for `odom`->`robot_front_laser_base_link`");
-    // std::string fromFrame = odom_frame_;
-    // std::string toFrame = laser_frame_;
-    std::string fromFrame = laser_frame_;
-    std::string toFrame = odom_frame_;
+    std::string parent_frame = odom_frame_;
+    std::string child_frame = laser_frame_;
     try {
-      odom_laser_t_ =
-          tf_buffer_->lookupTransform(toFrame, fromFrame, tf2::TimePointZero);
+      odom_laser_t_ = tf_buffer_->lookupTransform(parent_frame, child_frame,
+                                                  tf2::TimePointZero);
     } catch (const tf2::TransformException &ex) {
       RCLCPP_ERROR(this->get_logger(), "Could not transform %s to %s: %s",
-                   toFrame.c_str(), fromFrame.c_str(), ex.what());
+                   parent_frame.c_str(), child_frame.c_str(), ex.what());
       return;
     }
 
   } else if (listen_to_laser_cart_) {
-    // TODO: listen for TF `robot_front_laser_base_link`->`cart_frame`
+    // listen for TF `robot_front_laser_base_link`->`cart_frame`
+    RCLCPP_DEBUG(this->get_logger(),
+                 "Listening for `robot_front_laser_base_link`->`cart_frame`");
+    // std::string parent_frame = laser_frame_;
+    std::string parent_frame = "robot_base_link";
+    std::string child_frame = cart_frame_;
+    geometry_msgs::msg::TransformStamped t;
+    try {
+      t = tf_buffer_->lookupTransform(parent_frame, child_frame,
+                                      tf2::TimePointZero);
+    } catch (const tf2::TransformException &ex) {
+      RCLCPP_ERROR(this->get_logger(), "Could not transform %s to %s: %s",
+                   parent_frame.c_str(), child_frame.c_str(), ex.what());
+      return;
+    }
+
+    // move the robot toward cart_frame
+    double error_distance = sqrt(pow(t.transform.translation.x, 2) +
+                                 pow(t.transform.translation.y, 2));
+
+    double error_yaw =
+        atan2(t.transform.translation.y, t.transform.translation.x);
+
+    geometry_msgs::msg::Twist msg;
+
+    static const double kp_yaw = 0.05;
+    // DEBUG
+    // msg.angular.z = (error_yaw < ANGULAR_TOLERANCE) ? 0.0 : kp_yaw * error_yaw;
+    // end DEBUG
+
+    static const double kp_distance = 0.5;
+    msg.linear.x = (error_distance < LINEAR_TOLERANCE)
+                       ? 0.0
+                       : kp_distance * error_distance;
+
+    if (error_yaw < ANGULAR_TOLERANCE && error_distance < LINEAR_TOLERANCE) {
+      RCLCPP_INFO(this->get_logger(),
+                  "Moved robot within tolerance toward `cart_frame`. Stopping");
+      listen_to_laser_cart_ = false;
+    } else {
+      RCLCPP_DEBUG(this->get_logger(),
+                   "Moving robot toward `cart_frame` (x=%f, z=%f)",
+                   msg.linear.x, msg.angular.z);
+      vel_pub_->publish(msg);
+    }
   }
 }
 
@@ -329,7 +386,7 @@ ApproachServiceServer::solve_sas_triangle(double left_side, double right_side,
   // TODO
 
   // returning x_offset, y_offset, yaw
-  return std::make_tuple(0.75, 0.15, 0.0); // TODO: just to get the rest working
+  return std::make_tuple(0.75, 0.05, 0.0); // TODO: just to get the rest working
 }
 
 int main(int argc, char **argv) {
