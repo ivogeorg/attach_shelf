@@ -6,8 +6,10 @@
 #include "attach_shelf/srv/go_to_loading.hpp"
 #include "geometry_msgs/msg/detail/transform_stamped__struct.hpp"
 #include "geometry_msgs/msg/twist.hpp"
+#include "nav_msgs/msg/detail/odometry__struct.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp/subscription_options.hpp"
 #include "rclcpp/utilities.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
 
@@ -23,13 +25,29 @@ using LaserScan = sensor_msgs::msg::LaserScan;
 using std::placeholders::_1;
 using std::placeholders::_2;
 
+// Necessary for topic subscriptions
+class CustomSubscriptionOptions : public rclcpp::SubscriptionOptions {
+public:
+  CustomSubscriptionOptions(rclcpp::CallbackGroup::SharedPtr cb_group)
+      : rclcpp::SubscriptionOptions() {
+    this->callback_group = cb_group;
+  }
+  ~CustomSubscriptionOptions() = default;
+};
+
 class ApproachServiceServer : public rclcpp::Node {
 private:
+  rclcpp::CallbackGroup::SharedPtr cb_group_;
+  CustomSubscriptionOptions sub_options_;
+
   rclcpp::Service<GoToLoading>::SharedPtr srv_;
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
 
   bool have_scan_;
+  bool have_odom_;
   sensor_msgs::msg::LaserScan last_laser_;
+  nav_msgs::msg::Odometry last_odom_;
 
   const double REFLECTIVE_INTENSITY_VALUE = 8000; // for reflective points
   const int POINT_DIST_THRESHOLD = 10;            // for point set segmentation
@@ -39,12 +57,12 @@ private:
   std::string cart_frame_;
 
   bool broadcast_odom_cart_;  // connecting cart_frame to TF tree
-  bool listen_to_odom_laser_; // odom_laser_ serves as basis for odom_cart_
-  bool listen_to_laser_cart_; // laser_cart_ serves in the final approach
+  bool listen_to_odom_laser_; // odom_laser_t_ serves as basis for odom_cart_t_
+  bool listen_to_laser_cart_; // laser_cart_t_ serves in the final approach
 
-  geometry_msgs::msg::TransformStamped odom_cart_;
-  geometry_msgs::msg::TransformStamped odom_laser_;
-  geometry_msgs::msg::TransformStamped laser_cart_;
+  geometry_msgs::msg::TransformStamped odom_cart_t_;
+  geometry_msgs::msg::TransformStamped odom_laser_t_;
+  geometry_msgs::msg::TransformStamped laser_cart_t_;
 
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
@@ -64,6 +82,11 @@ private:
     have_scan_ = true;
   }
 
+  inline void odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
+    last_odom_ = *msg;
+    have_odom_ = true;
+  }
+
   void service_callback(const std::shared_ptr<GoToLoading::Request> request,
                         const std::shared_ptr<GoToLoading::Response> response);
   std::vector<std::vector<int>> segment(std::vector<int> &v);
@@ -75,22 +98,33 @@ private:
 
 ApproachServiceServer::ApproachServiceServer()
     : Node("approach_service_server_node"),
-      srv_{create_service<GoToLoading>(
+      cb_group_{
+          this->create_callback_group(rclcpp::CallbackGroupType::Reentrant)},
+      sub_options_{cb_group_},
+      srv_{this->create_service<GoToLoading>(
           "approach_shelf",
-          std::bind(&ApproachServiceServer::service_callback, this, _1, _2))},
+          std::bind(&ApproachServiceServer::service_callback, this, _1, _2),
+          rmw_qos_profile_services_default, cb_group_)},
       scan_sub_{this->create_subscription<sensor_msgs::msg::LaserScan>(
           "scan", 10,
-          std::bind(&ApproachServiceServer::laser_scan_callback, this, _1))},
-      have_scan_{false}, odom_frame_{"odom"}, broadcast_odom_cart_{false},
-      listen_to_odom_laser_{false}, listen_to_laser_cart_{false},
+          std::bind(&ApproachServiceServer::laser_scan_callback, this, _1),
+          sub_options_)},
+      odom_sub_{this->create_subscription<nav_msgs::msg::Odometry>(
+          "odom", 10,
+          std::bind(&ApproachServiceServer::odometry_callback, this, _1),
+          sub_options_)},
+      have_scan_{false}, have_odom_{false}, odom_frame_{"odom"},
       laser_frame_{"robot_front_laser_base_link"}, cart_frame_{"cart_frame"},
+      broadcast_odom_cart_{false}, listen_to_odom_laser_{false},
+      listen_to_laser_cart_{false},
       tf_buffer_{std::make_unique<tf2_ros::Buffer>(this->get_clock())},
       tf_listener_{std::make_shared<tf2_ros::TransformListener>(*tf_buffer_)},
       listener_timer_{this->create_wall_timer(
-          1s, std::bind(&ApproachServiceServer::listener_cb, this))},
+          1s, std::bind(&ApproachServiceServer::listener_cb, this), cb_group_)},
       tf_broadcaster_{std::make_shared<tf2_ros::TransformBroadcaster>(this)},
       broadcaster_timer_{this->create_wall_timer(
-          100ms, std::bind(&ApproachServiceServer::broadcaster_cb, this))} {}
+          100ms, std::bind(&ApproachServiceServer::broadcaster_cb, this),
+          cb_group_)} {}
 
 void ApproachServiceServer::service_callback(
     const std::shared_ptr<GoToLoading::Request> request,
@@ -139,16 +173,37 @@ void ApproachServiceServer::service_callback(
                "left_range = %f, right_range = %f, angle = %f", left_range,
                right_range, sas_angle);
 
-  // some x and y from solved SAS triangle, likely both negative, say x=-0.15,
-  // y=-0.75
-  //   double x = -0.15, y = -0.75;
+  // some x and y from solved SAS triangle
+  double x_offset, y_offset, yaw_correction;
+  std::tie(x_offset, y_offset, yaw_correction) =
+      solve_sas_triangle(left_range, right_range, sas_angle);
 
   // get the transform `odom`->`robot_front_laser_base_link`
+  listen_to_odom_laser_ = true;
+  rclcpp::sleep_for(3s); // TODO: Fine tune?
+
+  // TODO: a bit ugly, maybe a case for WaitSet
+  while (odom_laser_t_.header.frame_id.compare(odom_frame_) != 0)
+    ;
+
+  // get TF `odom`->`front_front_laser_base_link`
+  geometry_msgs::msg::TransformStamped t = odom_laser_t_;
+  RCLCPP_DEBUG(this->get_logger(), "odom_laser_t_.header.stamp=%d sec",
+               t.header.stamp.sec);
+  RCLCPP_DEBUG(this->get_logger(), "odom_laser_t_.header.frame_id='%s'",
+               t.header.frame_id.c_str());
+  RCLCPP_DEBUG(this->get_logger(), "odom_laser_t_.child_frame_id='%s'",
+               t.child_frame_id.c_str());
+
+  listen_to_odom_laser_ = false;
+
+  odom_cart_t_ = t;
+  odom_cart_t_.transform.translation.x += x_offset;
+  odom_cart_t_.transform.translation.y += y_offset;
+  odom_cart_t_.child_frame_id = cart_frame_;
 
   // 2. Add a `cart_frame` TF frame in between them.
-  //    Solving the SAS triangle, get the distance and angle to the midpoint
-  //    Calculate the transform from `robot_front_laser_base_link`
-  //    Use a (non-static) TransformPublisher to publish `cart_frame`
+  broadcast_odom_cart_ = true;
 
   // 3. Move the robot to `cart_frame` using a TransformListener.
   // 4. Move the robot 30 cm forward and stop.
@@ -189,7 +244,22 @@ void ApproachServiceServer::listener_cb() {
   // TODO
 
   if (listen_to_odom_laser_) {
-    // TODO: listen for TF `odom`->`robot_front_laser_base_link`
+    // listen for TF `odom`->`robot_front_laser_base_link`
+    RCLCPP_DEBUG(this->get_logger(),
+                 "Listening for `odom`->`robot_front_laser_base_link`");
+    // std::string fromFrame = odom_frame_;
+    // std::string toFrame = laser_frame_;
+    std::string fromFrame = laser_frame_;
+    std::string toFrame = odom_frame_;
+    try {
+      odom_laser_t_ =
+          tf_buffer_->lookupTransform(toFrame, fromFrame, tf2::TimePointZero);
+    } catch (const tf2::TransformException &ex) {
+      RCLCPP_ERROR(this->get_logger(), "Could not transform %s to %s: %s",
+                   toFrame.c_str(), fromFrame.c_str(), ex.what());
+      return;
+    }
+
   } else if (listen_to_laser_cart_) {
     // TODO: listen for TF `robot_front_laser_base_link`->`cart_frame`
   }
@@ -199,16 +269,20 @@ void ApproachServiceServer::broadcaster_cb() {
   // TODO
 
   if (broadcast_odom_cart_) {
-    // TODO: broadcast TF `odom`->`cart_frame`
+    // broadcast TF `odom`->`cart_frame`
+    RCLCPP_DEBUG(this->get_logger(), "Publishing cart_frame");
+    odom_cart_t_.header.stamp = this->get_clock()->now();
+    tf_broadcaster_->sendTransform(odom_cart_t_);
   } // otherwise, don't do anything
 }
 
 std::tuple<double, double, double>
-ApproachServiceServer::solve_sas_triangle(double left_side, double right_side, double sas_angle) {
+ApproachServiceServer::solve_sas_triangle(double left_side, double right_side,
+                                          double sas_angle) {
   // TODO
 
   // returning x_offset, y_offset, yaw
-  return std::make_tuple(0.0, 0.0, 0.0);
+  return std::make_tuple(0.75, 0.15, 0.0); // TODO: just to get the rest working
 }
 
 int main(int argc, char **argv) {
@@ -234,8 +308,12 @@ int main(int argc, char **argv) {
                 (levels[level]).c_str(), node->get_name());
   }
 
-  rclcpp::spin(node);
-  rclcpp::shutdown();
+  rclcpp::executors::MultiThreadedExecutor executor;
+  executor.add_node(node);
+  executor.spin();
+
+  //   rclcpp::spin(node);
+  //   rclcpp::shutdown();
 
   return 0;
 }

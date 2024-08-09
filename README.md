@@ -137,6 +137,17 @@ Briefly, after the RB1 robot has completed the pre-approach, has faced the crate
 11. Declare private `rclcpp::TimerBase::SharedPtr broadcaster_timer_`. It will serve to call the broadcaster callback.
 12. Declare private `void broadcaster_cb()`. It will call `tf_broadcaster_->sendTransform(odom_cart_t_)`.
 
+The final strategy, including some extra multithreading infrastructure, worked:  
+| Gazebo | Rviz2 | rqt_tf_tree |
+| --- | --- | --- |
+| ![Gazebo with cart_frame](assets/robot_position_when_cart_frame_published.png) | ![Rviz showing cart_frame](assets/cart_frame_showing_in_rviz2.png) | ![TF tree with cart_frame](assets/frames_with_cart_frame.png) |  
+
+Remaining problems:
+1. `cart_frame` is in the wront position.
+2. There is a mismatch in Gazebo and ROS2 (system) times:
+```
+[INFO] [1723168735.547565617] [tf2_echo]: Waiting for transform robot_front_laser_base_link ->  cart_frame: Lookup would require extrapolation into the past.  Requested time 1234.377000 but the earliest data is at time 1723168725.641735, when looking up transform from frame [cart_frame] to frame [robot_front_laser_base_link]
+```  
 
 ##### 4. `tf2_ros::TransformListener` for precision movement
 
