@@ -65,7 +65,8 @@ private:
   geometry_msgs::msg::TransformStamped laser_cart_t_;
 
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
-  std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+  std::shared_ptr<tf2_ros::TransformListener>
+      tf_listener_; // TODO: Consider StaticTL
   rclcpp::TimerBase::SharedPtr listener_timer_;
 
   std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
@@ -187,20 +188,66 @@ void ApproachServiceServer::service_callback(
     ;
 
   // get TF `odom`->`front_front_laser_base_link`
-  geometry_msgs::msg::TransformStamped t = odom_laser_t_;
   RCLCPP_DEBUG(this->get_logger(), "odom_laser_t_.header.stamp=%d sec",
-               t.header.stamp.sec);
+               odom_laser_t_.header.stamp.sec);
   RCLCPP_DEBUG(this->get_logger(), "odom_laser_t_.header.frame_id='%s'",
-               t.header.frame_id.c_str());
+               odom_laser_t_.header.frame_id.c_str());
   RCLCPP_DEBUG(this->get_logger(), "odom_laser_t_.child_frame_id='%s'",
-               t.child_frame_id.c_str());
+               odom_laser_t_.child_frame_id.c_str());
 
   listen_to_odom_laser_ = false;
 
-  odom_cart_t_ = t;
-  odom_cart_t_.transform.translation.x += x_offset;
-  odom_cart_t_.transform.translation.y += y_offset;
+  // Chain transforms
+  // Express the offsets in a new TransformStamped
+  geometry_msgs::msg::TransformStamped t;
+  //   t.header.stamp = this->get_clock()->now();
+  t.header.stamp = odom_laser_t_.header
+                       .stamp; // TODO: Will same work or should it be advanced?
+  t.header.frame_id = laser_frame_;
+  t.child_frame_id = cart_frame_;
+  t.transform.translation.x = x_offset;
+  t.transform.translation.y = y_offset;
+  t.transform.translation.z = 0.0;
+  t.transform.rotation.x = 0.0;
+  t.transform.rotation.y = 0.0;
+  t.transform.rotation.z = 0.0;
+  t.transform.rotation.w = 1.0;
+
+  tf2::Transform tf_odom_laser;
+  // Extract translation and rotation from TransformStamped
+  tf_odom_laser.setOrigin(tf2::Vector3(odom_laser_t_.transform.translation.x,
+                                       odom_laser_t_.transform.translation.y,
+                                       odom_laser_t_.transform.translation.z));
+  tf_odom_laser.setRotation(tf2::Quaternion(
+      odom_laser_t_.transform.rotation.x, odom_laser_t_.transform.rotation.y,
+      odom_laser_t_.transform.rotation.z, odom_laser_t_.transform.rotation.w));
+
+  tf2::Transform tf_laser_cart;
+  // Extract translation and rotation from TransformStamped
+  tf_laser_cart.setOrigin(tf2::Vector3(t.transform.translation.x,
+                                       t.transform.translation.y,
+                                       t.transform.translation.z));
+  tf_laser_cart.setRotation(
+      tf2::Quaternion(t.transform.rotation.x, t.transform.rotation.y,
+                      t.transform.rotation.z, t.transform.rotation.w));
+
+  // Chain the transforms
+  tf2::Transform tf_odom_cart = tf_odom_laser * tf_laser_cart;
+
+  // Fill in the header of odom_cart_t_
+  odom_cart_t_.header.stamp = this->get_clock()->now();
+  odom_cart_t_.header.frame_id = odom_frame_;
   odom_cart_t_.child_frame_id = cart_frame_;
+
+  // Directly assign the transform components
+  odom_cart_t_.transform.translation.x = tf_odom_cart.getOrigin().x();
+  odom_cart_t_.transform.translation.y = tf_odom_cart.getOrigin().y();
+  odom_cart_t_.transform.translation.z = tf_odom_cart.getOrigin().z();
+
+  odom_cart_t_.transform.rotation.x = tf_odom_cart.getRotation().x();
+  odom_cart_t_.transform.rotation.y = tf_odom_cart.getRotation().y();
+  odom_cart_t_.transform.rotation.z = tf_odom_cart.getRotation().z();
+  odom_cart_t_.transform.rotation.w = tf_odom_cart.getRotation().w();
 
   // 2. Add a `cart_frame` TF frame in between them.
   broadcast_odom_cart_ = true;

@@ -10,7 +10,6 @@ Panels:
         - /TF1
         - /TF1/Frames1
         - /TF1/Tree1
-        - /TF1/Tree1/odom1
         - /LaserScan1
       Splitter Ratio: 0.5792078971862793
     Tree Height: 565
@@ -286,18 +285,18 @@ Visualization Manager:
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 5.96612548828125
-        Y: -0.10690686851739883
-        Z: 0.7189988493919373
+        X: 5.522106647491455
+        Y: -0.2847713232040405
+        Z: 0.795711100101471
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.2103984355926514
+      Pitch: 1.2203984260559082
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 1.5303974151611328
+      Yaw: 1.5253974199295044
     Saved: ~
 Window Geometry:
   Displays:
