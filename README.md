@@ -144,10 +144,25 @@ The final strategy, including some extra multithreading infrastructure, worked:
 
 Remaining problems:
 1. `cart_frame` is in the wront position.
-2. There is a mismatch in Gazebo and ROS2 (system) times:
-```
-[INFO] [1723168735.547565617] [tf2_echo]: Waiting for transform robot_front_laser_base_link ->  cart_frame: Lookup would require extrapolation into the past.  Requested time 1234.377000 but the earliest data is at time 1723168725.641735, when looking up transform from frame [cart_frame] to frame [robot_front_laser_base_link]
-```  
+2. To avoid a mismatch in Gazebo and ROS2 (system) times like this:
+   ```
+   [INFO] [1723168735.547565617] [tf2_echo]: Waiting for transform robot_front_laser_base_link ->  cart_frame: Lookup would require extrapolation into the past.  Requested time 1234.377000 but the earliest data is at time 1723168725.641735, when looking up transform from frame [cart_frame] to frame [robot_front_laser_base_link]
+   ```  
+   add `parameters=[{'use_sim_time': True}],` to all launched `Node`-s
+   and get the intended output
+   ```
+   At time 445.299000000
+   - Translation: [-0.194, -0.739, -0.000]
+   - Rotation: in Quaternion [-0.000, 0.000, 0.002, 1.000]
+   - Rotation: in RPY (radian) [-0.000, 0.000, 0.003]
+   - Rotation: in RPY (degree) [-0.000, 0.000, 0.175]
+   - Matrix:
+     1.000 -0.003 -0.000 -0.194
+     0.003  1.000  0.000 -0.739
+    -0.000 -0.000  1.000 -0.000
+     0.000  0.000  0.000  1.000
+   ```
+
 
 ##### 4. `tf2_ros::TransformListener` for precision movement
 

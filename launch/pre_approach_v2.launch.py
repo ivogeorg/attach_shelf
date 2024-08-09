@@ -27,6 +27,7 @@ def generate_launch_description():
         output='screen',
         name='pre_approach_v2_node',
         emulate_tty=True,
+        parameters=[{'use_sim_time': True}],
         arguments=["-obstacle", obstacle_f,
                    "-degrees", degrees_f,
                    "-final_approach", final_approach_f,]

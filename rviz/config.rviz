@@ -10,6 +10,7 @@ Panels:
         - /TF1
         - /TF1/Frames1
         - /TF1/Tree1
+        - /TF1/Tree1/odom1
         - /LaserScan1
       Splitter Ratio: 0.5792078971862793
     Tree Height: 565
@@ -146,6 +147,8 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
+        cart_frame:
+          Value: true
         odom:
           Value: false
         robot_base_docking_contact_link:
@@ -172,9 +175,11 @@ Visualization Manager:
       Name: TF
       Show Arrows: true
       Show Axes: true
-      Show Names: false
+      Show Names: true
       Tree:
         odom:
+          cart_frame:
+            {}
           robot_base_footprint:
             robot_base_link:
               robot_evelator_base_link:

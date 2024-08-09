@@ -13,6 +13,7 @@ def generate_launch_description():
         output='screen',
         name='approach_shelf_service_server_node',
         emulate_tty=True,
+        parameters=[{'use_sim_time': True}]
     )
 
     # create and return launch description object
