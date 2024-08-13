@@ -84,7 +84,7 @@ private:
   enum class ApproachStage {
     LINEAR_CORRECTION,
     INIT_ROTATION,
-    LINEAR,
+    LINEAR_APPROACH,
     FINAL_ROTATION
   };
   ApproachStage approach_stage_;
@@ -159,10 +159,11 @@ ApproachServiceServer::ApproachServiceServer()
       broadcaster_timer_{this->create_wall_timer(
           100ms, std::bind(&ApproachServiceServer::broadcaster_cb, this),
           cb_group_)},
-      approach_stage_{ApproachStage::INIT_ROTATION} {
-        // TODO: Change to LINEAR_CORRECTION if included, either here or in service_cb()
-        RCLCPP_INFO(this->get_logger(), "Server of /approach_shelf service started");
-      }
+      approach_stage_{ApproachStage::LINEAR_CORRECTION} {
+  // TODO: Change to LINEAR_CORRECTION if included, either here or in
+  // service_cb()
+  RCLCPP_INFO(this->get_logger(), "Server of /approach_shelf service started");
+}
 
 void ApproachServiceServer::service_callback(
     const std::shared_ptr<GoToLoading::Request> request,
@@ -342,10 +343,10 @@ void ApproachServiceServer::listener_cb() {
   // 1. ODOM->LASER
   if (listen_to_odom_laser_) {
     // listen for TF `odom`->`robot_front_laser_base_link`
-    RCLCPP_DEBUG(this->get_logger(),
-                 "Listening for `odom`->`robot_front_laser_base_link`");
     std::string parent_frame = odom_frame_;
     std::string child_frame = laser_frame_;
+    RCLCPP_DEBUG(this->get_logger(), "Listening for `%s`->`%s`", parent_frame,
+                 child_frame);
     try {
       odom_laser_t_ = tf_buffer_->lookupTransform(parent_frame, child_frame,
                                                   tf2::TimePointZero);
@@ -366,12 +367,11 @@ void ApproachServiceServer::listener_cb() {
 
     // NOTE: These have to be fall-through
 
-    // listen for TF `robot_front_laser_base_link`->`cart_frame`
-    RCLCPP_DEBUG(this->get_logger(),
-                 "Listening for `robot_front_laser_base_link`->`cart_frame`");
-    // std::string parent_frame = laser_frame_;
+    // listen for TF `robot_base_link`->`cart_frame`
     std::string parent_frame = "robot_base_link";
     std::string child_frame = cart_frame_;
+    RCLCPP_DEBUG(this->get_logger(), "Listening for `%s`->`%s`",
+                 parent_frame.c_str(), child_frame.c_str());
     geometry_msgs::msg::TransformStamped t;
     try {
       t = tf_buffer_->lookupTransform(parent_frame, child_frame,
@@ -386,12 +386,12 @@ void ApproachServiceServer::listener_cb() {
     double error_distance = sqrt(pow(t.transform.translation.x, 2) +
                                  pow(t.transform.translation.y, 2));
 
-    double error_yaw =
-        atan2(t.transform.translation.y, t.transform.translation.x);
+    // double error_yaw =
+    //     atan2(t.transform.translation.y, t.transform.translation.x);
 
     geometry_msgs::msg::Twist msg;
 
-    static const double kp_yaw = 0.05;
+    // static const double kp_yaw = 0.05;
     // DEBUG
     // msg.angular.z = (error_yaw < ANGULAR_TOLERANCE) ? 0.0 : kp_yaw *
     // error_yaw; end DEBUG
@@ -435,18 +435,15 @@ ApproachServiceServer::solve_sas_triangle(double l_side, double r_side,
                                           double sas_angle) {
 
   /***********************************************************
-  Note: The diagram is vertically mirrored but the calculations
-        are correct. The directions on the right are correct.
-
                 frame_length
   \------------|--y-->.------------------/
-   \lsa        |pi/2  .             rsa/
+   \rsa        |pi/2  .             lsa/
     \          |     .               /
      \         |     .             /
       \        |    .            /                 +x
        \    h/x|    .bisect    /
         \      |   .         /                      ^
-   r_side\     |   .--ba   /l_side                  |
+   l_side\     |   .--ba   /r_side                  |
           \    |---ha   \/                          |
            \   |w .  \ /                    +yaw /--|--\ -yaw
             \  |a.   /                           V  |  V
@@ -486,26 +483,26 @@ ApproachServiceServer::solve_sas_triangle(double l_side, double r_side,
 
   // 2. Solve the right triangle (l_side, frame_length - y, x (or h))
   //    Given: l_side, rsa, right angle where h intersects frame
-  //    Find:  y, x, ha
-  double ha, x, y;
+  //    Find:  y, x, h_angle
+  double h_angle, x, y;
   // (y + frame_length/2.0) = l_side * cos(rsa)
   y = l_side * cos(rsa) - frame_length / 2.0;                    // ?????
   x = sqrt(pow(l_side, 2.0) - pow(frame_length / 2.0 + y, 2.0)); // pithagoras
 
-  // Note: See diagram above for the rsa, lha, and ha angles
+  // Note: See diagram above for the rsa, lha, and h_angle angles
   if (r_side == l_side) {
-    ha = sas_angle / 2.0;
+    h_angle = sas_angle / 2.0;
   } else if (r_side > l_side) {
-    ha = normalize_angle(PI_ / 2.0 - lsa);
+    h_angle = normalize_angle(PI_ / 2.0 - lsa);
   } else {
-    ha = normalize_angle(PI_ / 2.0 - rsa); // normalize
+    h_angle = normalize_angle(PI_ / 2.0 - rsa); // normalize
   }
 
   RCLCPP_DEBUG(this->get_logger(), "Given:");
   RCLCPP_DEBUG(this->get_logger(), "l_side=%f, rsa=%f, right angle", l_side,
                rsa);
   RCLCPP_DEBUG(this->get_logger(), "Found:");
-  RCLCPP_DEBUG(this->get_logger(), "x=%f, y=%f, ha=%f", x, y, ha);
+  RCLCPP_DEBUG(this->get_logger(), "x=%f, y=%f, h_angle=%f", x, y, h_angle);
 
   // Note: See diagram above for sign of y
   if (l_side < r_side)
@@ -513,8 +510,8 @@ ApproachServiceServer::solve_sas_triangle(double l_side, double r_side,
 
   // 3. Solve the SAS trinagle
   //    Given: l_side + rsa OR r_side + lsa, frame_length / 2.0
-  //    Find:  ba, yaw = ha-ba
-  double bisect, yaw = 0.0, ba;
+  //    Find:  b_angle, yaw = h_angle-b_angle
+  double bisect, yaw = 0.0, b_angle = 0.0;
 
   if (r_side == l_side) {
     yaw = 0.0;
@@ -522,24 +519,25 @@ ApproachServiceServer::solve_sas_triangle(double l_side, double r_side,
     // SAS triangle: l_side, rsa, frame_length/2.0
     bisect = sqrt(pow(l_side, 2.0) + pow(frame_length / 2.0, 2.0) -
                   2.0 * l_side * (frame_length / 2.0) * cos(rsa));
-    ba = asin((frame_length / 2.0) * sin(rsa) / bisect);
+    b_angle = asin((frame_length / 2.0) * sin(rsa) / bisect);
   } else {
     // SAS triangle: r_side, lsa, frame_length/2.0
     bisect = sqrt(pow(r_side, 2.0) + pow(frame_length / 2.0, 2.0) -
                   2.0 * r_side * (frame_length / 2.0) * cos(lsa));
-    ba = asin((frame_length / 2.0) * sin(lsa) / bisect);
+    b_angle = asin((frame_length / 2.0) * sin(lsa) / bisect);
   }
-  yaw = ha - ba;
+  RCLCPP_DEBUG(this->get_logger(), "h_angle=%f, b_angle=%f", h_angle, b_angle);
+  yaw = h_angle - b_angle;
 
   // Note: See diagram for sign of initial yaw
-  if (l_side > r_side)
+  if (r_side > l_side)
     yaw *= -1;
 
-  /* NOTE: 
-        x and y are for positioning crate_frame, yaw is not used
-        yaw is for the robot to face crate_frame, and then rotate back 
+  /* NOTE:
+     1. x and y are for positioning crate_frame, yaw is not used in TF
+     2. yaw is for the robot to face crate_frame, and then rotate back
 
-        Essentially the TransformStamped's rotation will be ignored
+     Essentially the TransformStamped's rotation will be ignored
   */
 
   // TODO: Test thoroughly
