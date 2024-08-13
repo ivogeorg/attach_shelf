@@ -8,7 +8,7 @@ from launch_ros.actions import Node
 def generate_launch_description():
 
     obstacle_arg = DeclareLaunchArgument(
-        "obstacle", default_value="0.30"
+        "obstacle", default_value="0.45"
     )
     degrees_arg = DeclareLaunchArgument(
         "degrees", default_value="-90.0"

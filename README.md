@@ -140,7 +140,11 @@ Briefly, after the RB1 robot has completed the pre-approach, has faced the crate
 The final strategy, including some extra multithreading infrastructure, worked:  
 | Gazebo | Rviz2 | rqt_tf_tree |
 | --- | --- | --- |
-| ![Gazebo with cart_frame](assets/robot_position_when_cart_frame_published.png) | ![Rviz showing cart_frame](assets/cart_frame_showing_in_rviz2.png) | ![TF tree with cart_frame](assets/frames_with_cart_frame.png) |  
+| ![Gazebo with cart_frame](assets/robot_position_when_cart_frame_published.png) | ![Rviz showing cart_frame](assets/cart_frame_showing_in_rviz2.png) | ![TF tree with cart_frame](assets/frames_with_cart_frame.png) |   
+
+At `obstacle=0.45`, robot can reach `cart_frame` without complex computations:
+![Robot at `cart_frame`](assets/robot_at_cart_frame.png)  
+![`robot_base_link` reached `cart_frame`](assets/robot_base_link_reached_cart_frame.png)  
 
 **Notes on important details:**
 1. `cart_frame` requires transform _chaining_:
@@ -395,3 +399,11 @@ Arguments (pass arguments as '<name>:=<value>'):
         (default: 'false')
 ```
 
+##### 8. Attaching to the shelf/cart
+
+1. The topic is `/elevator_up` and is of type `std_msgs::msg::String`.
+2. Need to send "data: `1`" on the command line but from the python code in [`attach_client.py`](scripts/attach_client.py) it looks like in will be `msg.data = 1`.
+3. There is no visual change to the robot, that is, anything like lifting its top up toward the shelf/cart above it.
+   ![RB1 moving with cart on top](assets/rb1_moving_with_cart.png)  
+   ![RB1 moving with cart on top](assets/rb1_moving_with_cart-1.png)  
+   

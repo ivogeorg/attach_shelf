@@ -13,6 +13,7 @@
 #include "rclcpp/subscription_options.hpp"
 #include "rclcpp/utilities.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
+#include "std_msgs/msg/string.hpp"
 
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "tf2/exceptions.h"
@@ -49,6 +50,7 @@ private:
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr vel_pub_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr elev_up_pub_;
 
   bool have_scan_;
   bool have_odom_;
@@ -80,6 +82,8 @@ private:
 
   const double LINEAR_TOLERANCE = 0.04;  // m
   const double ANGULAR_TOLERANCE = 0.07; // rad
+  const double LINEAR_BASE = 0.075;      // m/s
+  const double ANGULAR_BASE = 0.04;      // rad/s
 
   enum class ApproachStage {
     LINEAR_CORRECTION,
@@ -88,6 +92,8 @@ private:
     FINAL_ROTATION
   };
   ApproachStage approach_stage_;
+
+  enum class MotionDirection { FORWARD, BACKWARD };
 
 public:
   ApproachServiceServer();
@@ -125,6 +131,7 @@ private:
   void broadcaster_cb();
   std::tuple<double, double, double>
   solve_sas_triangle(double left_side, double right_side, double sas_angle);
+  void move(double dist_m, MotionDirection dir);
 };
 
 ApproachServiceServer::ApproachServiceServer()
@@ -146,6 +153,8 @@ ApproachServiceServer::ApproachServiceServer()
           topic_pub_sub_options_)},
       vel_pub_{this->create_publisher<geometry_msgs::msg::Twist>(
           "/diffbot_base_controller/cmd_vel_unstamped", 1)},
+      elev_up_pub_{
+          this->create_publisher<std_msgs::msg::String>("/elevator_up", 1)},
       have_scan_{false}, have_odom_{false}, odom_frame_{"odom"},
       laser_frame_{"robot_front_laser_base_link"}, cart_frame_{"cart_frame"},
       broadcast_odom_cart_{false}, listen_to_odom_laser_{false},
@@ -303,10 +312,31 @@ void ApproachServiceServer::service_callback(
   broadcaster_timer_->cancel();
 
   // 4. Move the robot 30 cm forward and stop.
+  move(0.3, MotionDirection::FORWARD);
 
   // 5. Lift the elevator to attach to the cart/shelf.
+  std_msgs::msg::String msg;
+  msg.data = 1;
+  elev_up_pub_->publish(msg);
 
+  // TODO: This one should return `true`. Figure out the logic.
   response->complete = false;
+}
+void ApproachServiceServer::move(double dist_m, MotionDirection dir) {
+
+  // Use straight /odom)
+  geometry_msgs::msg::Twist twist;
+  twist.linear.x =
+      (dir == MotionDirection::FORWARD) ? LINEAR_BASE : -LINEAR_BASE;
+  double dist = 0.0, x, y;
+  while (abs(dist + LINEAR_TOLERANCE) < dist_m) {
+    vel_pub_->publish(twist);
+    rclcpp::sleep_for(100ms);
+
+    x = last_odom_.pose.pose.position.x;
+    y = last_odom_.pose.pose.position.y;
+    dist += sqrt(pow(x, 2.0) + pow(y, 2.0));
+  }
 }
 
 std::vector<std::vector<int>>
@@ -345,8 +375,8 @@ void ApproachServiceServer::listener_cb() {
     // listen for TF `odom`->`robot_front_laser_base_link`
     std::string parent_frame = odom_frame_;
     std::string child_frame = laser_frame_;
-    RCLCPP_DEBUG(this->get_logger(), "Listening for `%s`->`%s`", parent_frame,
-                 child_frame);
+    RCLCPP_DEBUG(this->get_logger(), "Listening for `%s`->`%s`",
+                 parent_frame.c_str(), child_frame.c_str());
     try {
       odom_laser_t_ = tf_buffer_->lookupTransform(parent_frame, child_frame,
                                                   tf2::TimePointZero);
@@ -427,7 +457,7 @@ void ApproachServiceServer::broadcaster_cb() {
     RCLCPP_DEBUG(this->get_logger(), "Publishing cart_frame");
     odom_cart_t_.header.stamp = this->get_clock()->now();
     tf_broadcaster_->sendTransform(odom_cart_t_);
-  } // otherwise, don't do anything
+  } // else no-op
 }
 
 std::tuple<double, double, double>
