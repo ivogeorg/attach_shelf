@@ -161,7 +161,7 @@ Visualization Manager:
         robot_front_cover_link:
           Value: false
         robot_front_laser_base_link:
-          Value: false
+          Value: true
         robot_omni_backwheel_link:
           Value: false
         robot_omni_front_leftwheel_link:

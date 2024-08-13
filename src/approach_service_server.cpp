@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <iostream>
 #include <tuple>
 
@@ -18,6 +19,10 @@
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_broadcaster.h"
 #include "tf2_ros/transform_listener.h"
+
+#define PI_ 3.14159265359
+#define DEG2RAD (PI_ / 180.0)
+#define RAD2DEG (180.0 / PI_)
 
 using namespace std::chrono_literals;
 using GoToLoading = attach_shelf::srv::GoToLoading;
@@ -90,6 +95,15 @@ private:
   inline void odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
     last_odom_ = *msg;
     have_odom_ = true;
+  }
+
+  inline double normalize_angle(double angle) {
+    double res = angle;
+    while (res > PI_)
+      res -= 2.0 * PI_;
+    while (res < -PI_)
+      res += 2.0 * PI_;
+    return res;
   }
 
   void service_callback(const std::shared_ptr<GoToLoading::Request> request,
@@ -308,7 +322,6 @@ ApproachServiceServer::segment(std::vector<int> &v) {
 void ApproachServiceServer::listener_cb() {
   // TODO
 
-
   // 1. ODOM->LASER
   if (listen_to_odom_laser_) {
     // listen for TF `odom`->`robot_front_laser_base_link`
@@ -327,7 +340,7 @@ void ApproachServiceServer::listener_cb() {
 
     // 2. BASE->CART
   } else if (listen_to_laser_cart_) {
-    // TODO: 
+    // TODO:
     // Break into sections:
     // - forward the length of the horizontal distance between base and laser
     // - rotate toward cart_frame so there is no yaw to correct
@@ -361,8 +374,8 @@ void ApproachServiceServer::listener_cb() {
 
     static const double kp_yaw = 0.05;
     // DEBUG
-    // msg.angular.z = (error_yaw < ANGULAR_TOLERANCE) ? 0.0 : kp_yaw * error_yaw;
-    // end DEBUG
+    // msg.angular.z = (error_yaw < ANGULAR_TOLERANCE) ? 0.0 : kp_yaw *
+    // error_yaw; end DEBUG
 
     static const double kp_distance = 0.5;
     msg.linear.x = (error_distance < LINEAR_TOLERANCE)
@@ -372,10 +385,11 @@ void ApproachServiceServer::listener_cb() {
     // DEBUG
     // clamp
     if (msg.linear.x < 0.075)
-        msg.linear.x = 0.075;
+      msg.linear.x = 0.075;
     // end DEBUG
 
-    if (/*error_yaw < ANGULAR_TOLERANCE &&*/ error_distance < LINEAR_TOLERANCE) {
+    if (/*error_yaw < ANGULAR_TOLERANCE &&*/ error_distance <
+        LINEAR_TOLERANCE) {
       RCLCPP_INFO(this->get_logger(),
                   "Moved robot within tolerance of `cart_frame`. Stopping");
       listen_to_laser_cart_ = false;
@@ -400,29 +414,81 @@ void ApproachServiceServer::broadcaster_cb() {
 }
 
 std::tuple<double, double, double>
-ApproachServiceServer::solve_sas_triangle(double left_side, double right_side,
+ApproachServiceServer::solve_sas_triangle(double l_side, double r_side,
                                           double sas_angle) {
 
-    /***********************************************************
-                 A - sas_angle
-                /|.\
-               / |y. \                      +y <----- | -----> -y
-              /  |a.   \                              |
-             /   |w .    \                            |
-            /    |  .      \                          | 
-     r_side/    h|   .       \left_side               |
-          /      |   .         \                      v
-         /       |    .bisect    \
-        /        |    .            \                 +x
-       /         |     .             \
-      /          |     .               \
-     /lsa    half_c bsa .             rsa\
-    /------------|----->.------------------\
-    /***********************************************************/
-  // TODO
+  /***********************************************************
+                frame_length
+  \------------|--y-->.------------------/
+   \lsa        |pi/2  .             rsa/
+    \          |     .               /
+     \         |     .             /
+      \        |    .            /                 +x
+       \    h/x|    .bisect    /
+        \      |   .         /                      ^
+   r_side\     |   .-lba   /l_side                  |
+          \    |--lha   \/                          |
+           \   |w .  \ /                            |
+            \  |a.   /                              |
+             \ |y. /                      -y <----- | -----> +y
+              \|./                        (in laser link frame)
+               V - sas_angle
+  ***********************************************************/
+  
+  // 1. Solve a2 = b2 + c2 − 2bc cosA
+  //    Given: r_side, l_side, sas_angle
+  //    Find:  frame_length, lsa (angle), rsa (angle)
+  double frame_length, lsa, rsa;
+  frame_length = sqrt(pow(r_side, 2.0) + pow(l_side, 2.0) -
+                      2.0 * r_side * l_side * cos(sas_angle));
+
+  if (r_side == l_side) {
+    // rsa = lsa
+    rsa = lsa = (2.0 * PI_ - sas_angle) / 2.0;
+  } else if (r_side > l_side) {
+    // l_side is shorter and lsa is the smaller angle
+    // ( sin(lsa) / l_side ) = ( sin(sas_angle) / frame_length )
+    lsa = asin(l_side * sin(sas_angle) / frame_length);
+    rsa = PI_ - sas_angle - lsa; // Sum angles = PI rad
+  } else {
+    // r_side is shorter and rsa is the smaller angle
+    // ( sin(rsa) / r_side ) = (sin(sas_angle) / frame_length )
+    rsa = asin(r_side * sin(sas_angle) / frame_length);
+    lsa = PI_ - sas_angle - rsa;
+  }
+
+  RCLCPP_DEBUG(this->get_logger(), "Given:");
+  RCLCPP_DEBUG(this->get_logger(), "r_side=%f, l_side=%f, sas_angle=%f", r_side,
+               l_side, sas_angle);
+  RCLCPP_DEBUG(this->get_logger(), "Found:");
+  RCLCPP_DEBUG(this->get_logger(), "rsa=%f, lsa=%f, frame_length=%f", rsa, lsa,
+               frame_length);
+
+  // 2. Solve the right triangle (l_side, frame_length - y, x (or h))
+  //    Given: l_side, rsa, right angle where h intersects frame
+  //    Find:  y, x, lha
+  double lha, x, y;
+  // (y + frame_length/2.0) = l_side * cos(rsa)
+  y = l_side * cos(rsa) - frame_length / 2.0; // ?????
+  x = sqrt(pow(l_side, 2.0) - pow(frame_length / 2.0 + y, 2.0)); // pithagoras
+  lha = normalize_angle(PI_ / 2.0 - rsa);                  // normalize
+
+  RCLCPP_DEBUG(this->get_logger(), "Given:");
+  RCLCPP_DEBUG(this->get_logger(), "l_side=%f, rsa=%f, right angle", l_side,
+               rsa);
+  RCLCPP_DEBUG(this->get_logger(), "Found:");
+  RCLCPP_DEBUG(this->get_logger(), "x=%f, y=%f, lha=%f", x, y, lha);
+
+  if (l_side < r_side)
+    y *= -1;
+
+  // 3. TODO: Solve the SAS trinagle
+  //    Given: l_side, frame_length / 2.0, rsa
+  //    Find:  lba, yaw = lha-lba
 
   // returning x_offset, y_offset, yaw
-  return std::make_tuple(0.75, 0.05, 0.0); // TODO: just to get the rest working
+  RCLCPP_DEBUG(this->get_logger(), "Returning: x=%f, y=%f, lha=%f", x, y, 0.0);
+  return std::make_tuple(x, y, 0.0);
 }
 
 int main(int argc, char **argv) {
