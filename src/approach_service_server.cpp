@@ -73,8 +73,8 @@ private:
   std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
   rclcpp::TimerBase::SharedPtr broadcaster_timer_;
 
-  const double LINEAR_TOLERANCE = 0.03;  // m
-  const double ANGULAR_TOLERANCE = 0.01; // rad
+  const double LINEAR_TOLERANCE = 0.04;  // m
+  const double ANGULAR_TOLERANCE = 0.07; // rad
 
 public:
   ApproachServiceServer();
@@ -265,7 +265,10 @@ void ApproachServiceServer::service_callback(
   while (listen_to_laser_cart_)
     ;
 
+  broadcast_odom_cart_ = false;
+
   listener_timer_->cancel();
+  broadcaster_timer_->cancel();
 
   // 4. Move the robot 30 cm forward and stop.
 
@@ -305,6 +308,8 @@ ApproachServiceServer::segment(std::vector<int> &v) {
 void ApproachServiceServer::listener_cb() {
   // TODO
 
+
+  // 1. ODOM->LASER
   if (listen_to_odom_laser_) {
     // listen for TF `odom`->`robot_front_laser_base_link`
     RCLCPP_DEBUG(this->get_logger(),
@@ -320,7 +325,15 @@ void ApproachServiceServer::listener_cb() {
       return;
     }
 
+    // 2. BASE->CART
   } else if (listen_to_laser_cart_) {
+    // TODO: 
+    // Break into sections:
+    // - forward the length of the horizontal distance between base and laser
+    // - rotate toward cart_frame so there is no yaw to correct
+    // - forward toward cart_frame
+    // - rotate to perpendicular to cart_frame
+
     // listen for TF `robot_front_laser_base_link`->`cart_frame`
     RCLCPP_DEBUG(this->get_logger(),
                  "Listening for `robot_front_laser_base_link`->`cart_frame`");
@@ -356,9 +369,15 @@ void ApproachServiceServer::listener_cb() {
                        ? 0.0
                        : kp_distance * error_distance;
 
-    if (error_yaw < ANGULAR_TOLERANCE && error_distance < LINEAR_TOLERANCE) {
+    // DEBUG
+    // clamp
+    if (msg.linear.x < 0.075)
+        msg.linear.x = 0.075;
+    // end DEBUG
+
+    if (/*error_yaw < ANGULAR_TOLERANCE &&*/ error_distance < LINEAR_TOLERANCE) {
       RCLCPP_INFO(this->get_logger(),
-                  "Moved robot within tolerance toward `cart_frame`. Stopping");
+                  "Moved robot within tolerance of `cart_frame`. Stopping");
       listen_to_laser_cart_ = false;
     } else {
       RCLCPP_DEBUG(this->get_logger(),
@@ -383,6 +402,23 @@ void ApproachServiceServer::broadcaster_cb() {
 std::tuple<double, double, double>
 ApproachServiceServer::solve_sas_triangle(double left_side, double right_side,
                                           double sas_angle) {
+
+    /***********************************************************
+                 A - sas_angle
+                /|.\
+               / |y. \                      +y <----- | -----> -y
+              /  |a.   \                              |
+             /   |w .    \                            |
+            /    |  .      \                          | 
+     r_side/    h|   .       \left_side               |
+          /      |   .         \                      v
+         /       |    .bisect    \
+        /        |    .            \                 +x
+       /         |     .             \
+      /          |     .               \
+     /lsa    half_c bsa .             rsa\
+    /------------|----->.------------------\
+    /***********************************************************/
   // TODO
 
   // returning x_offset, y_offset, yaw
