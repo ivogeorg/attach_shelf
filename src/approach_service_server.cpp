@@ -81,6 +81,14 @@ private:
   const double LINEAR_TOLERANCE = 0.04;  // m
   const double ANGULAR_TOLERANCE = 0.07; // rad
 
+  enum class ApproachStage {
+    LINEAR_CORRECTION,
+    INIT_ROTATION,
+    LINEAR,
+    FINAL_ROTATION
+  };
+  ApproachStage approach_stage_;
+
 public:
   ApproachServiceServer();
   ~ApproachServiceServer() = default;
@@ -104,6 +112,10 @@ private:
     while (res < -PI_)
       res += 2.0 * PI_;
     return res;
+  }
+
+  inline double yaw_from_quaternion(double x, double y, double z, double w) {
+    return atan2(2.0f * (w * z + x * y), w * w + x * x - y * y - z * z);
   }
 
   void service_callback(const std::shared_ptr<GoToLoading::Request> request,
@@ -141,11 +153,16 @@ ApproachServiceServer::ApproachServiceServer()
       tf_buffer_{std::make_unique<tf2_ros::Buffer>(this->get_clock())},
       tf_listener_{std::make_shared<tf2_ros::TransformListener>(*tf_buffer_)},
       listener_timer_{this->create_wall_timer(
-          1s, std::bind(&ApproachServiceServer::listener_cb, this), cb_group_)},
+          100ms, std::bind(&ApproachServiceServer::listener_cb, this),
+          cb_group_)},
       tf_broadcaster_{std::make_shared<tf2_ros::TransformBroadcaster>(this)},
       broadcaster_timer_{this->create_wall_timer(
           100ms, std::bind(&ApproachServiceServer::broadcaster_cb, this),
-          cb_group_)} {}
+          cb_group_)},
+      approach_stage_{ApproachStage::INIT_ROTATION} {
+        // TODO: Change to LINEAR_CORRECTION if included, either here or in service_cb()
+        RCLCPP_INFO(this->get_logger(), "Server of /approach_shelf service started");
+      }
 
 void ApproachServiceServer::service_callback(
     const std::shared_ptr<GoToLoading::Request> request,
@@ -347,6 +364,8 @@ void ApproachServiceServer::listener_cb() {
     // - forward toward cart_frame
     // - rotate to perpendicular to cart_frame
 
+    // NOTE: These have to be fall-through
+
     // listen for TF `robot_front_laser_base_link`->`cart_frame`
     RCLCPP_DEBUG(this->get_logger(),
                  "Listening for `robot_front_laser_base_link`->`cart_frame`");
@@ -403,8 +422,6 @@ void ApproachServiceServer::listener_cb() {
 }
 
 void ApproachServiceServer::broadcaster_cb() {
-  // TODO
-
   if (broadcast_odom_cart_) {
     // broadcast TF `odom`->`cart_frame`
     RCLCPP_DEBUG(this->get_logger(), "Publishing cart_frame");
@@ -419,7 +436,7 @@ ApproachServiceServer::solve_sas_triangle(double l_side, double r_side,
 
   /***********************************************************
   Note: The diagram is vertically mirrored but the calculations
-        are correct.
+        are correct. The directions on the right are correct.
 
                 frame_length
   \------------|--y-->.------------------/
@@ -494,7 +511,7 @@ ApproachServiceServer::solve_sas_triangle(double l_side, double r_side,
   if (l_side < r_side)
     y *= -1;
 
-  // 3. TODO: Solve the SAS trinagle
+  // 3. Solve the SAS trinagle
   //    Given: l_side + rsa OR r_side + lsa, frame_length / 2.0
   //    Find:  ba, yaw = ha-ba
   double bisect, yaw = 0.0, ba;
@@ -505,12 +522,12 @@ ApproachServiceServer::solve_sas_triangle(double l_side, double r_side,
     // SAS triangle: l_side, rsa, frame_length/2.0
     bisect = sqrt(pow(l_side, 2.0) + pow(frame_length / 2.0, 2.0) -
                   2.0 * l_side * (frame_length / 2.0) * cos(rsa));
-    ba = asin((frame_length/2.0) * sin(rsa) / bisect);
+    ba = asin((frame_length / 2.0) * sin(rsa) / bisect);
   } else {
     // SAS triangle: r_side, lsa, frame_length/2.0
     bisect = sqrt(pow(r_side, 2.0) + pow(frame_length / 2.0, 2.0) -
                   2.0 * r_side * (frame_length / 2.0) * cos(lsa));
-    ba = asin((frame_length/2.0) * sin(lsa) / bisect);
+    ba = asin((frame_length / 2.0) * sin(lsa) / bisect);
   }
   yaw = ha - ba;
 
@@ -518,7 +535,16 @@ ApproachServiceServer::solve_sas_triangle(double l_side, double r_side,
   if (l_side > r_side)
     yaw *= -1;
 
-  // returning x_offset, y_offset, yaw
+  /* NOTE: 
+        x and y are for positioning crate_frame, yaw is not used
+        yaw is for the robot to face crate_frame, and then rotate back 
+
+        Essentially the TransformStamped's rotation will be ignored
+  */
+
+  // TODO: Test thoroughly
+
+  // Returning x_offset, y_offset, yaw
   RCLCPP_DEBUG(this->get_logger(), "Returning: x=%f, y=%f, yaw=%f", x, y, yaw);
   return std::make_tuple(x, y, yaw);
 }
