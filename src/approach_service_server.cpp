@@ -418,6 +418,9 @@ ApproachServiceServer::solve_sas_triangle(double l_side, double r_side,
                                           double sas_angle) {
 
   /***********************************************************
+  Note: The diagram is vertically mirrored but the calculations
+        are correct.
+
                 frame_length
   \------------|--y-->.------------------/
    \lsa        |pi/2  .             rsa/
@@ -426,15 +429,15 @@ ApproachServiceServer::solve_sas_triangle(double l_side, double r_side,
       \        |    .            /                 +x
        \    h/x|    .bisect    /
         \      |   .         /                      ^
-   r_side\     |   .-lba   /l_side                  |
-          \    |--lha   \/                          |
-           \   |w .  \ /                            |
-            \  |a.   /                              |
+   r_side\     |   .--ba   /l_side                  |
+          \    |---ha   \/                          |
+           \   |w .  \ /                    +yaw /--|--\ -yaw
+            \  |a.   /                           V  |  V
              \ |y. /                      -y <----- | -----> +y
               \|./                        (in laser link frame)
                V - sas_angle
   ***********************************************************/
-  
+
   // 1. Solve a2 = b2 + c2 − 2bc cosA
   //    Given: r_side, l_side, sas_angle
   //    Find:  frame_length, lsa (angle), rsa (angle)
@@ -466,29 +469,58 @@ ApproachServiceServer::solve_sas_triangle(double l_side, double r_side,
 
   // 2. Solve the right triangle (l_side, frame_length - y, x (or h))
   //    Given: l_side, rsa, right angle where h intersects frame
-  //    Find:  y, x, lha
-  double lha, x, y;
+  //    Find:  y, x, ha
+  double ha, x, y;
   // (y + frame_length/2.0) = l_side * cos(rsa)
-  y = l_side * cos(rsa) - frame_length / 2.0; // ?????
+  y = l_side * cos(rsa) - frame_length / 2.0;                    // ?????
   x = sqrt(pow(l_side, 2.0) - pow(frame_length / 2.0 + y, 2.0)); // pithagoras
-  lha = normalize_angle(PI_ / 2.0 - rsa);                  // normalize
+
+  // Note: See diagram above for the rsa, lha, and ha angles
+  if (r_side == l_side) {
+    ha = sas_angle / 2.0;
+  } else if (r_side > l_side) {
+    ha = normalize_angle(PI_ / 2.0 - lsa);
+  } else {
+    ha = normalize_angle(PI_ / 2.0 - rsa); // normalize
+  }
 
   RCLCPP_DEBUG(this->get_logger(), "Given:");
   RCLCPP_DEBUG(this->get_logger(), "l_side=%f, rsa=%f, right angle", l_side,
                rsa);
   RCLCPP_DEBUG(this->get_logger(), "Found:");
-  RCLCPP_DEBUG(this->get_logger(), "x=%f, y=%f, lha=%f", x, y, lha);
+  RCLCPP_DEBUG(this->get_logger(), "x=%f, y=%f, ha=%f", x, y, ha);
 
+  // Note: See diagram above for sign of y
   if (l_side < r_side)
     y *= -1;
 
   // 3. TODO: Solve the SAS trinagle
-  //    Given: l_side, frame_length / 2.0, rsa
-  //    Find:  lba, yaw = lha-lba
+  //    Given: l_side + rsa OR r_side + lsa, frame_length / 2.0
+  //    Find:  ba, yaw = ha-ba
+  double bisect, yaw = 0.0, ba;
+
+  if (r_side == l_side) {
+    yaw = 0.0;
+  } else if (l_side > r_side) {
+    // SAS triangle: l_side, rsa, frame_length/2.0
+    bisect = sqrt(pow(l_side, 2.0) + pow(frame_length / 2.0, 2.0) -
+                  2.0 * l_side * (frame_length / 2.0) * cos(rsa));
+    ba = asin((frame_length/2.0) * sin(rsa) / bisect);
+  } else {
+    // SAS triangle: r_side, lsa, frame_length/2.0
+    bisect = sqrt(pow(r_side, 2.0) + pow(frame_length / 2.0, 2.0) -
+                  2.0 * r_side * (frame_length / 2.0) * cos(lsa));
+    ba = asin((frame_length/2.0) * sin(lsa) / bisect);
+  }
+  yaw = ha - ba;
+
+  // Note: See diagram for sign of initial yaw
+  if (l_side > r_side)
+    yaw *= -1;
 
   // returning x_offset, y_offset, yaw
-  RCLCPP_DEBUG(this->get_logger(), "Returning: x=%f, y=%f, lha=%f", x, y, 0.0);
-  return std::make_tuple(x, y, 0.0);
+  RCLCPP_DEBUG(this->get_logger(), "Returning: x=%f, y=%f, yaw=%f", x, y, yaw);
+  return std::make_tuple(x, y, yaw);
 }
 
 int main(int argc, char **argv) {
