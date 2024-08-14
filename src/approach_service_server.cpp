@@ -1,3 +1,10 @@
+/**
+ * @file approach_service_server.cpp
+ * @brief Implements a final approach service for the RB1 robot.
+ * @author Ivo Georgiev
+ * @version 0.9 
+ */
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -31,6 +38,13 @@ using LaserScan = sensor_msgs::msg::LaserScan;
 using std::placeholders::_1;
 using std::placeholders::_2;
 
+/**
+ * @class CustomSubscriptionOptions
+ * @brief Used to set callback groups for topic subsctiptions.
+ * A very simple derived class to allow init-list initialization 
+ * of callback groups for topic subscriptions due to the signature
+ * of rclcpp::Node::create_subscription.
+ */
 // Necessary for topic subscriptions
 class CustomSubscriptionOptions : public rclcpp::SubscriptionOptions {
 public:
@@ -41,6 +55,10 @@ public:
   ~CustomSubscriptionOptions() = default;
 };
 
+/**
+ * @class ApproachServiceServer
+ * @brief A multi-callback node implementing the final approach service.
+ */
 class ApproachServiceServer : public rclcpp::Node {
 private:
   rclcpp::CallbackGroup::SharedPtr cb_group_;
@@ -85,6 +103,10 @@ private:
   const double LINEAR_BASE = 0.075;      // m/s
   const double ANGULAR_BASE = 0.04;      // rad/s
 
+  /**
+   * @class ApproachStage
+   * @brief An enum type for the stages of the final approach.
+   */
   enum class ApproachStage {
     LINEAR_CORRECTION,
     INIT_ROTATION,
@@ -93,6 +115,11 @@ private:
   };
   ApproachStage approach_stage_;
 
+  /**
+   * @class MotionDirection
+   * @brief An enum type for the directions of motion.
+   * @see move()
+   */
   enum class MotionDirection { FORWARD, BACKWARD };
 
 public:
@@ -100,17 +127,26 @@ public:
   ~ApproachServiceServer() = default;
 
 private:
+  /**
+   * @brief Callback for the sensor_msgs::msg::LaserScan subsctiption.
+   */
   inline void
   laser_scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
     last_laser_ = *msg;
     have_scan_ = true;
   }
 
+  /**
+   * @brief Callback for the nav_msgs::msg::Odometry subsctiption.
+   */
   inline void odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
     last_odom_ = *msg;
     have_odom_ = true;
   }
 
+  /**
+   * @brief Normalizes an angle between PI and -PI
+   */
   inline double normalize_angle(double angle) {
     double res = angle;
     while (res > PI_)
@@ -120,6 +156,9 @@ private:
     return res;
   }
 
+  /**
+   * @brief Simple conversion of a quaternion to Euler angle yaw.
+   */
   inline double yaw_from_quaternion(double x, double y, double z, double w) {
     return atan2(2.0f * (w * z + x * y), w * w + x * x - y * y - z * z);
   }
@@ -134,6 +173,9 @@ private:
   void move(double dist_m, MotionDirection dir);
 };
 
+/**
+ * @brief Sole constructor initializing all ROS2 members.
+ */
 ApproachServiceServer::ApproachServiceServer()
     : Node("approach_service_server_node"),
       cb_group_{
@@ -174,18 +216,22 @@ ApproachServiceServer::ApproachServiceServer()
   RCLCPP_INFO(this->get_logger(), "Server of /approach_shelf service started");
 }
 
+/**
+ * @brief The callback for the /approach_shelf service.
+ * It is called after the pre-approach is complete and 
+ * implements the final approach and the attachment of
+ * the shelf/crate to the RB1 robot.
+ */
 void ApproachServiceServer::service_callback(
     const std::shared_ptr<GoToLoading::Request> request,
     const std::shared_ptr<GoToLoading::Response> response) {
   RCLCPP_INFO(this->get_logger(), "Recived request with attach_to_service='%s'",
               request->attach_to_shelf ? "true" : "false");
 
-  while (!have_scan_) {
+  while (!have_scan_ || !have_odom_) {
     RCLCPP_INFO(this->get_logger(), "Waiting for data");
     rclcpp::sleep_for(100ms);
   }
-
-  // TODO: implement the service
 
   // Functionality:
 
