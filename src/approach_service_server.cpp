@@ -115,10 +115,12 @@ private:
   };
   ApproachStage approach_stage_;
 
+  double yaw_correction_;
+
   /**
    * @class MotionDirection
    * @brief An enum type for the directions of motion.
-   * @see move()
+   * @see method move() uses as parameter
    */
   enum class MotionDirection { FORWARD, BACKWARD };
 
@@ -129,6 +131,7 @@ public:
 private:
   /**
    * @brief Callback for the sensor_msgs::msg::LaserScan subsctiption.
+   * @param msg The lastest LaserScan message posted on the /scan topic
    */
   inline void
   laser_scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
@@ -138,6 +141,7 @@ private:
 
   /**
    * @brief Callback for the nav_msgs::msg::Odometry subsctiption.
+   * @param msg The lastest Odometry message posted on the /odom topic
    */
   inline void odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
     last_odom_ = *msg;
@@ -146,6 +150,8 @@ private:
 
   /**
    * @brief Normalizes an angle between PI and -PI
+   * @param angle Angle to normalize
+   * @return Normalized angle
    */
   inline double normalize_angle(double angle) {
     double res = angle;
@@ -158,6 +164,7 @@ private:
 
   /**
    * @brief Simple conversion of a quaternion to Euler angle yaw.
+   * @param x, y, z, w Quaternion elements
    */
   inline double yaw_from_quaternion(double x, double y, double z, double w) {
     return atan2(2.0f * (w * z + x * y), w * w + x * x - y * y - z * z);
@@ -165,7 +172,8 @@ private:
 
   void service_callback(const std::shared_ptr<GoToLoading::Request> request,
                         const std::shared_ptr<GoToLoading::Response> response);
-  std::vector<std::vector<int>> segment(std::vector<int> &v);
+  std::vector<std::vector<int>> segment(std::vector<int> &v,
+                                        const int threshold);
   void listener_cb();
   void broadcaster_cb();
   std::tuple<double, double, double>
@@ -175,6 +183,8 @@ private:
 
 /**
  * @brief Sole constructor initializing all ROS2 members.
+ * The options are initialized with the callback group so
+ * that topic subscribers can be properly added to it.
  */
 ApproachServiceServer::ApproachServiceServer()
     : Node("approach_service_server_node"),
@@ -221,6 +231,8 @@ ApproachServiceServer::ApproachServiceServer()
  * It is called after the pre-approach is complete and
  * implements the final approach and the attachment of
  * the shelf/crate to the RB1 robot.
+ * @param request Service request (attach_to_shelf)
+ * @param response Service response (complete)
  */
 void ApproachServiceServer::service_callback(
     const std::shared_ptr<GoToLoading::Request> request,
@@ -250,7 +262,8 @@ void ApproachServiceServer::service_callback(
 
   // 1.2 Segment the set
   std::vector<std::vector<int>> reflective_vector_set;
-  reflective_vector_set = segment(reflective_point_indices);
+  reflective_vector_set =
+      segment(reflective_point_indices, POINT_DIST_THRESHOLD);
 
   unsigned int num_reflective_plates =
       static_cast<unsigned int>(reflective_vector_set.size());
@@ -292,8 +305,9 @@ void ApproachServiceServer::service_callback(
 
   // 2.3 Solve SAS triangle
   // To get x, y, and yaw of `cart_frame`
-  double x_offset, y_offset, yaw_correction; // TODO: Use yaw_correction
-  std::tie(x_offset, y_offset, yaw_correction) =
+  // yaw will be used in TF listener for approach
+  double x_offset, y_offset;
+  std::tie(x_offset, y_offset, yaw_correction_) =
       solve_sas_triangle(left_range, right_range, sas_angle);
 
   // 2.4 Get TF odom_laser_t_
@@ -377,12 +391,15 @@ void ApproachServiceServer::service_callback(
                 "Broadasting `cart_frame`. Final approach not requested");
     response->complete = false;
     return;
+  } else {
+    RCLCPP_INFO(this->get_logger(), "Broadasting `cart_frame`");
   }
 
   // 3. Move the frame `robot_base_link` to `cart_frame`, facing straight in
   rclcpp::sleep_for(3s); // Wait for `cart_frame` TF to start broadcasting
 
   // 3.1 Listen for TF `robot_base_link`->`cart_frame`
+  RCLCPP_INFO(this->get_logger(), "Approaching shelf");
   listen_to_robot_base_cart_ = true;
 
   // 3.2 Wait for robot to move to `cart_frame`
@@ -397,9 +414,11 @@ void ApproachServiceServer::service_callback(
   broadcaster_timer_->cancel();
 
   // 4. Move the robot 30 cm forward and stop
+  RCLCPP_INFO(this->get_logger(), "Moving under shelf");
   move(0.3, MotionDirection::FORWARD);
 
   // 5. Lift the elevator to attach to the cart/shelf
+  RCLCPP_INFO(this->get_logger(), "Attaching to shelf");
   std_msgs::msg::String msg;
   msg.data = 1;
   elev_up_pub_->publish(msg);
@@ -431,9 +450,12 @@ void ApproachServiceServer::move(double dist_m, MotionDirection dir) {
 
 /**
  * @brief Segments a sorted linear collection of numbers
+ * @param v a vector of integers to segment
+ * @param threshold the minimum distance between segments
+ * @return A vector of vectors each holding a segment
  */
 std::vector<std::vector<int>>
-ApproachServiceServer::segment(std::vector<int> &v) {
+ApproachServiceServer::segment(std::vector<int> &v, const int threshold) {
   std::vector<std::vector<int>> vector_set;
 
   std::sort(v.begin(), v.end());
@@ -442,7 +464,7 @@ ApproachServiceServer::segment(std::vector<int> &v) {
   std::vector<int> vec;
   for (auto &p : v) {
     if (p - last != p) { // not the first point
-      if (p - last < POINT_DIST_THRESHOLD) {
+      if (p - last < threshold) {
         vec.push_back(p);
       } else {
         vector_set.push_back(vec);
@@ -493,6 +515,32 @@ void ApproachServiceServer::listener_cb() {
     // - rotate to perpendicular to cart_frame
 
     // NOTE: These have to be fall-through
+
+    // TODO: Should factor in the result of "degrees" argument,
+    //       that is, the robot yaw at the beginning of the 
+    //       approach should be taken into consideration to 
+    //       make sure the robot approaches without bumping into
+    //       the cart and also moves straight in underneath it
+
+    switch (approach_stage_) {
+    case ApproachStage::LINEAR_CORRECTION:
+        // get `robot_base_link` to move forward the length
+        // of the x offset of `robot_front_laser_base_link`
+        break;
+    case ApproachStage::INIT_ROTATION:
+        // get robot to face along a straight line to 
+        // `cart_frame` using yaw_correction_
+        break;
+    case ApproachStage::LINEAR_APPROACH:
+        // get `robot_base_link` to coincide with `cart_frame`
+        // (translational x and y only) by using TF between them
+        break;
+    case ApproachStage::FINAL_ROTATION:
+        // get the robot to face straight in along the length
+        // of the shelf (should be -yaw_correction_)
+        break;
+    }
+
 
     // listen for TF `robot_base_link`->`cart_frame`
     std::string parent_frame = "robot_base_link";
