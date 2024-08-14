@@ -2,7 +2,7 @@
  * @file approach_service_server.cpp
  * @brief Implements a final approach service for the RB1 robot.
  * @author Ivo Georgiev
- * @version 0.9 
+ * @version 0.9
  */
 
 #include <algorithm>
@@ -41,7 +41,7 @@ using std::placeholders::_2;
 /**
  * @class CustomSubscriptionOptions
  * @brief Used to set callback groups for topic subsctiptions.
- * A very simple derived class to allow init-list initialization 
+ * A very simple derived class to allow init-list initialization
  * of callback groups for topic subscriptions due to the signature
  * of rclcpp::Node::create_subscription.
  */
@@ -84,7 +84,7 @@ private:
 
   bool broadcast_odom_cart_;  // connecting cart_frame to TF tree
   bool listen_to_odom_laser_; // odom_laser_t_ serves as basis for odom_cart_t_
-  bool listen_to_laser_cart_; // laser_cart_t_ serves in the final approach
+  bool listen_to_robot_base_cart_; // laser_cart_t_ serves in the final approach
 
   geometry_msgs::msg::TransformStamped odom_cart_t_;
   geometry_msgs::msg::TransformStamped odom_laser_t_;
@@ -200,7 +200,7 @@ ApproachServiceServer::ApproachServiceServer()
       have_scan_{false}, have_odom_{false}, odom_frame_{"odom"},
       laser_frame_{"robot_front_laser_base_link"}, cart_frame_{"cart_frame"},
       broadcast_odom_cart_{false}, listen_to_odom_laser_{false},
-      listen_to_laser_cart_{false},
+      listen_to_robot_base_cart_{false},
       tf_buffer_{std::make_unique<tf2_ros::Buffer>(this->get_clock())},
       tf_listener_{std::make_shared<tf2_ros::TransformListener>(*tf_buffer_)},
       listener_timer_{this->create_wall_timer(
@@ -218,7 +218,7 @@ ApproachServiceServer::ApproachServiceServer()
 
 /**
  * @brief The callback for the /approach_shelf service.
- * It is called after the pre-approach is complete and 
+ * It is called after the pre-approach is complete and
  * implements the final approach and the attachment of
  * the shelf/crate to the RB1 robot.
  */
@@ -228,12 +228,11 @@ void ApproachServiceServer::service_callback(
   RCLCPP_INFO(this->get_logger(), "Recived request with attach_to_service='%s'",
               request->attach_to_shelf ? "true" : "false");
 
+  // Wait for /scan and /odom callbacks to be called
   while (!have_scan_ || !have_odom_) {
     RCLCPP_INFO(this->get_logger(), "Waiting for data");
     rclcpp::sleep_for(100ms);
   }
-
-  // Functionality:
 
   // 1. Detect reflective plates.
   std::vector<int> reflective_point_indices;
@@ -241,23 +240,47 @@ void ApproachServiceServer::service_callback(
     if (last_laser_.intensities[i] == REFLECTIVE_INTENSITY_VALUE)
       reflective_point_indices.push_back(i);
 
-  // segment the set
+  // 1.1 If none, return with complete=False
+  if (reflective_point_indices.size() == 0) {
+    RCLCPP_ERROR(this->get_logger(),
+                 "Did not detect any cart reflective plates");
+    response->complete = false;
+    return;
+  }
+
+  // 1.2 Segment the set
   std::vector<std::vector<int>> reflective_vector_set;
   reflective_vector_set = segment(reflective_point_indices);
 
-  RCLCPP_DEBUG(this->get_logger(), "Segmented reflective points into %d sets",
-               static_cast<int>(reflective_vector_set.size()));
+  unsigned int num_reflective_plates =
+      static_cast<unsigned int>(reflective_vector_set.size());
 
-  // the segments are sorted, externally and internally
-  // pick the two innermost points, one from each set
+  RCLCPP_DEBUG(this->get_logger(), "Segmented reflective points into %d sets",
+               num_reflective_plates);
+
+  // 1.3 If only one, return with complete=False
+  if (num_reflective_plates < 2) {
+    RCLCPP_ERROR(this->get_logger(),
+                 "Did not detect two cart reflective plates");
+    response->complete = false;
+    return;
+  }
+
+  // 2. Add `cart_frame`
+  // Chain the TF `odom`->`robot_front_laser_base_link` and
+  // `robot_front_laser_base_link`->`cart_frame` (constructed)
+  // to get `odom`->`cart_frame`
+
+  // 2.1 Pick the two innermost points, one from each set
+  // Note: The segments are sorted, externally and internally
   int left_ix, right_ix;
-  left_ix = reflective_vector_set[0][reflective_vector_set[0].size() - 1];
+  left_ix = reflective_vector_set[0][num_reflective_plates - 1];
   right_ix = reflective_vector_set[1][0];
 
   RCLCPP_DEBUG(this->get_logger(), "left_ix = %d, right_ix = %d", left_ix,
                right_ix);
 
-  // SAS triangle
+  // 2.2 Define a SAS triangle
   double left_range, right_range, sas_angle;
   left_range = last_laser_.ranges[left_ix];
   right_range = last_laser_.ranges[right_ix];
@@ -267,20 +290,21 @@ void ApproachServiceServer::service_callback(
                "left_range = %f, right_range = %f, angle = %f", left_range,
                right_range, sas_angle);
 
-  // some x and y from solved SAS triangle
-  double x_offset, y_offset, yaw_correction;
+  // 2.3 Solve SAS triangle
+  // To get x, y, and yaw of `cart_frame`
+  double x_offset, y_offset, yaw_correction; // TODO: Use yaw_correction
   std::tie(x_offset, y_offset, yaw_correction) =
       solve_sas_triangle(left_range, right_range, sas_angle);
 
-  // get the transform `odom`->`robot_front_laser_base_link`
-  listen_to_odom_laser_ = true;
-  rclcpp::sleep_for(3s); // TODO: Fine tune?
+  // 2.4 Get TF odom_laser_t_
+  // `odom`->`robot_front_laser_base_link`
+  listen_to_odom_laser_ = true; // Let the listner look up TF
+  rclcpp::sleep_for(3s);        // Wait for the listener
 
-  // TODO: a bit ugly, maybe a case for WaitSet
+  // Wait for odom_laser_t_ to be assigned by listener
   while (odom_laser_t_.header.frame_id.compare(odom_frame_) != 0)
     ;
 
-  // get TF `odom`->`front_front_laser_base_link`
   RCLCPP_DEBUG(this->get_logger(), "odom_laser_t_.header.stamp=%d sec",
                odom_laser_t_.header.stamp.sec);
   RCLCPP_DEBUG(this->get_logger(), "odom_laser_t_.header.frame_id='%s'",
@@ -288,16 +312,15 @@ void ApproachServiceServer::service_callback(
   RCLCPP_DEBUG(this->get_logger(), "odom_laser_t_.child_frame_id='%s'",
                odom_laser_t_.child_frame_id.c_str());
 
+  // Got odom_laser_t_, no need to listen for it any more
   listen_to_odom_laser_ = false;
 
-  // Chain transforms
+  // 2.5 Chain transforms
   // Express the offsets in a new TransformStamped
   geometry_msgs::msg::TransformStamped t;
-  //   t.header.stamp = this->get_clock()->now();
-  t.header.stamp = odom_laser_t_.header
-                       .stamp; // TODO: Will same work or should it be advanced?
-  t.header.frame_id = laser_frame_;
-  t.child_frame_id = cart_frame_;
+  t.header.stamp = odom_laser_t_.header.stamp;
+  t.header.frame_id = laser_frame_; // `robot_front_laser_base_link`
+  t.child_frame_id = cart_frame_;   // `cart_frame`
   t.transform.translation.x = x_offset;
   t.transform.translation.y = y_offset;
   t.transform.translation.z = 0.0;
@@ -324,15 +347,15 @@ void ApproachServiceServer::service_callback(
       tf2::Quaternion(t.transform.rotation.x, t.transform.rotation.y,
                       t.transform.rotation.z, t.transform.rotation.w));
 
-  // Chain the transforms
+  // Chain the transforms to get TF `odom`->`cart_frame`
   tf2::Transform tf_odom_cart = tf_odom_laser * tf_laser_cart;
 
-  // Fill in the header of odom_cart_t_
+  // Fill in the header of TransformStamped odom_cart_t_
   odom_cart_t_.header.stamp = this->get_clock()->now();
-  odom_cart_t_.header.frame_id = odom_frame_;
-  odom_cart_t_.child_frame_id = cart_frame_;
+  odom_cart_t_.header.frame_id = odom_frame_; // `odom`
+  odom_cart_t_.child_frame_id = cart_frame_;  // `cart_frame`
 
-  // Directly assign the transform components
+  // Directly assign the transform components to the TransformStamped
   odom_cart_t_.transform.translation.x = tf_odom_cart.getOrigin().x();
   odom_cart_t_.transform.translation.y = tf_odom_cart.getOrigin().y();
   odom_cart_t_.transform.translation.z = tf_odom_cart.getOrigin().z();
@@ -342,31 +365,48 @@ void ApproachServiceServer::service_callback(
   odom_cart_t_.transform.rotation.z = tf_odom_cart.getRotation().z();
   odom_cart_t_.transform.rotation.w = tf_odom_cart.getRotation().w();
 
-  // 2. Add a `cart_frame` TF frame in between them.
-  broadcast_odom_cart_ = true;
+  // 2.6 Broadcast `cart_frame` TF
+  broadcast_odom_cart_ = true; // start the broadcaster
 
-  // 3. Move the robot to `cart_frame` using a TransformListener.
-  rclcpp::sleep_for(3s); // TODO: fine tune or WaitSet?
-  listen_to_laser_cart_ = true;
+  // 2.7 If final approach not requested, return complete=true
+  // Note: The requirements are logically incomplete, so assuming
+  // the service should return `complete`=`true` even if it is
+  // not completing the final approach
+  if (!request->attach_to_shelf) {
+    RCLCPP_INFO(this->get_logger(),
+                "Broadasting `cart_frame`. Final approach not requested");
+    response->complete = true;
+    return;
+  }
 
-  while (listen_to_laser_cart_)
+  // 3. Move the frame `robot_base_link` to `cart_frame`, facing straight in
+  rclcpp::sleep_for(3s); // Wait for `cart_frame` TF to start broadcasting
+
+  // 3.1 Listen for TF `robot_base_link`->`cart_frame`
+  listen_to_robot_base_cart_ = true;
+
+  // 3.2 Wait for robot to move to `cart_frame`
+  while (listen_to_robot_base_cart_)
     ;
 
+  // 3.3 Stop broadcasting `cart_frame`
   broadcast_odom_cart_ = false;
 
+  // 3.4 Stop listening and broadcasting
   listener_timer_->cancel();
   broadcaster_timer_->cancel();
 
-  // 4. Move the robot 30 cm forward and stop.
+  // 4. Move the robot 30 cm forward and stop
   move(0.3, MotionDirection::FORWARD);
 
-  // 5. Lift the elevator to attach to the cart/shelf.
+  // 5. Lift the elevator to attach to the cart/shelf
   std_msgs::msg::String msg;
   msg.data = 1;
   elev_up_pub_->publish(msg);
 
-  // TODO: This one should return `true`. Figure out the logic.
-  response->complete = false;
+  // 6. Return success of final approach
+  RCLCPP_INFO(this->get_logger(), "Final approach completed");
+  response->complete = true;
 }
 void ApproachServiceServer::move(double dist_m, MotionDirection dir) {
 
@@ -433,7 +473,7 @@ void ApproachServiceServer::listener_cb() {
     }
 
     // 2. BASE->CART
-  } else if (listen_to_laser_cart_) {
+  } else if (listen_to_robot_base_cart_) {
     // TODO:
     // Break into sections:
     // - forward the length of the horizontal distance between base and laser
@@ -487,7 +527,7 @@ void ApproachServiceServer::listener_cb() {
         LINEAR_TOLERANCE) {
       RCLCPP_INFO(this->get_logger(),
                   "Moved robot within tolerance of `cart_frame`. Stopping");
-      listen_to_laser_cart_ = false;
+      listen_to_robot_base_cart_ = false;
     } else {
       RCLCPP_DEBUG(this->get_logger(),
                    "Moving robot toward `cart_frame` (x=%f, z=%f)",
