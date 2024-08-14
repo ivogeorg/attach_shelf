@@ -370,12 +370,12 @@ void ApproachServiceServer::service_callback(
 
   // 2.7 If final approach not requested, return complete=true
   // Note: The requirements are logically incomplete, so assuming
-  // the service should return `complete`=`true` even if it is
-  // not completing the final approach
+  // the service should return `complete=false` since it is not
+  // completing the final approach
   if (!request->attach_to_shelf) {
     RCLCPP_INFO(this->get_logger(),
                 "Broadasting `cart_frame`. Final approach not requested");
-    response->complete = true;
+    response->complete = false;
     return;
   }
 
@@ -408,6 +408,10 @@ void ApproachServiceServer::service_callback(
   RCLCPP_INFO(this->get_logger(), "Final approach completed");
   response->complete = true;
 }
+
+/**
+ * @brief Simple linear motion
+ */
 void ApproachServiceServer::move(double dist_m, MotionDirection dir) {
 
   // Use straight /odom)
