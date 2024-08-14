@@ -429,6 +429,9 @@ void ApproachServiceServer::move(double dist_m, MotionDirection dir) {
   }
 }
 
+/**
+ * @brief Segments a sorted linear collection of numbers
+ */
 std::vector<std::vector<int>>
 ApproachServiceServer::segment(std::vector<int> &v) {
   std::vector<std::vector<int>> vector_set;
@@ -457,6 +460,10 @@ ApproachServiceServer::segment(std::vector<int> &v) {
   return vector_set;
 }
 
+/**
+ * @brief Transform listener callback
+ * Used in creating `cart_frame` TF and first stage of the final approach
+ */
 void ApproachServiceServer::listener_cb() {
   // TODO
 
@@ -541,6 +548,10 @@ void ApproachServiceServer::listener_cb() {
   }
 }
 
+/**
+ * @brief Transform broadcaster callback
+ * Used to broadcast `cart_frame` TF
+ */
 void ApproachServiceServer::broadcaster_cb() {
   if (broadcast_odom_cart_) {
     // broadcast TF `odom`->`cart_frame`
@@ -550,6 +561,18 @@ void ApproachServiceServer::broadcaster_cb() {
   } // else no-op
 }
 
+/**
+ * @brief Finding precise coordinates of `cart_frame`
+ * Use trigonometry to return the x and y offset of
+ * `cart_frame` from `robot_front_laser_base_link`
+ * and the yaw the robot needs to turn to face
+ * straight, first toward `cart_frame` and then in
+ * along the length of the shelf/cart.
+ * @param l_side the range of the innermost reflective point on the left
+ * @param r_side the range of the innermost reflective point on the right
+ * @param sas_angle the angle between the two rays
+ * @return A tuple {x, y, yaw} (See long description above)
+ */
 std::tuple<double, double, double>
 ApproachServiceServer::solve_sas_triangle(double l_side, double r_side,
                                           double sas_angle) {
@@ -667,6 +690,12 @@ ApproachServiceServer::solve_sas_triangle(double l_side, double r_side,
   return std::make_tuple(x, y, yaw);
 }
 
+/*
+ * @brief main
+ * Uses a MultiThreadedExecutor running a multi-
+ * callback node with a single callback group.
+ * Also sets the log severity level for the node.
+ */
 int main(int argc, char **argv) {
   rclcpp::init(argc, argv);
 
@@ -680,7 +709,10 @@ int main(int argc, char **argv) {
       {RCUTILS_LOG_SEVERITY::RCUTILS_LOG_SEVERITY_WARN, "WARN"},
       {RCUTILS_LOG_SEVERITY::RCUTILS_LOG_SEVERITY_ERROR, "ERROR"},
       {RCUTILS_LOG_SEVERITY::RCUTILS_LOG_SEVERITY_FATAL, "FATAL"}};
+
+  // Set the log severity level here
   int level = RCUTILS_LOG_SEVERITY::RCUTILS_LOG_SEVERITY_DEBUG;
+
   if (rcutils_logging_set_logger_level(logger.get_name(), level) !=
       RCUTILS_RET_OK) {
     RCLCPP_ERROR(logger, "Failed to set logger level '%s' for %s.",
@@ -693,9 +725,6 @@ int main(int argc, char **argv) {
   rclcpp::executors::MultiThreadedExecutor executor;
   executor.add_node(node);
   executor.spin();
-
-  //   rclcpp::spin(node);
-  //   rclcpp::shutdown();
 
   return 0;
 }
