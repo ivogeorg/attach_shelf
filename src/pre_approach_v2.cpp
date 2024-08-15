@@ -34,7 +34,8 @@ private:
   Motion motion_;
 
   const double LINEAR_BASE = 0.5;
-  const double ANGULAR_BASE = 0.25;
+//   const double ANGULAR_BASE = 0.25;
+  const double ANGULAR_BASE = 0.45;
   const double LINEAR_TOLERANCE = 0.005;  // meters
   const double ANGULAR_TOLERANCE = 0.012; // about 2/3 of a deg
   const double ANGULAR_TOLERANCE_DEG = ANGULAR_TOLERANCE * RAD2DEG;
