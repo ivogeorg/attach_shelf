@@ -100,7 +100,7 @@ private:
 
   const double LINEAR_TOLERANCE = 0.04;  // m
   const double ANGULAR_TOLERANCE = 0.07; // rad
-  const double LINEAR_BASE = 0.1;      // m/s
+  const double LINEAR_BASE = 0.1;        // m/s
   const double ANGULAR_BASE = 0.04;      // rad/s
 
   /**
@@ -223,7 +223,7 @@ ApproachServiceServer::ApproachServiceServer()
       tf_buffer_{std::make_unique<tf2_ros::Buffer>(this->get_clock())},
       tf_listener_{std::make_shared<tf2_ros::TransformListener>(*tf_buffer_)},
       listener_timer_{this->create_wall_timer(
-          100ms, std::bind(&ApproachServiceServer::listener_cb, this),
+          200ms, std::bind(&ApproachServiceServer::listener_cb, this),
           cb_group_)},
       tf_broadcaster_{std::make_shared<tf2_ros::TransformBroadcaster>(this)},
       broadcaster_timer_{this->create_wall_timer(
@@ -447,8 +447,7 @@ void ApproachServiceServer::move(double dist_m, MotionDirection dir,
 
   // Use straight /odom)
   geometry_msgs::msg::Twist twist;
-  twist.linear.x =
-      (dir == MotionDirection::FORWARD) ? speed : -speed;
+  twist.linear.x = (dir == MotionDirection::FORWARD) ? speed : -speed;
   double dist = 0.0, x, y;
   while (abs(dist + LINEAR_TOLERANCE) < dist_m) {
     vel_pub_->publish(twist);
@@ -519,6 +518,11 @@ void ApproachServiceServer::listener_cb() {
 
     // 2. BASE->CART
   } else if (listen_to_robot_base_cart_) {
+    // NEW STRATEGY:
+    // 1. Yaw toward `cart_frame` in service_cb()
+    // 2. Use lookupTransform() to reach `cart_frame` in listener_cb()
+    // 3. Rotate to 0 deg world coordinates in service_cb()
+
     // TODO:
     // Break into sections:
     // - forward the length of the horizontal distance between base and laser
@@ -572,29 +576,24 @@ void ApproachServiceServer::listener_cb() {
     double error_distance = sqrt(pow(t.transform.translation.x, 2) +
                                  pow(t.transform.translation.y, 2));
 
+    // TODO: Derive from quaternion?
     // double error_yaw =
     //     atan2(t.transform.translation.y, t.transform.translation.x);
+    double error_yaw =
+        yaw_from_quaternion(t.transform.rotation.x, t.transform.rotation.y,
+                            t.transform.rotation.z, t.transform.rotation.w);
 
     geometry_msgs::msg::Twist msg;
 
-    // static const double kp_yaw = 0.05;
-    // DEBUG
-    // msg.angular.z = (error_yaw < ANGULAR_TOLERANCE) ? 0.0 : kp_yaw *
-    // error_yaw; end DEBUG
+    static const double kp_yaw = 0.65;
+    msg.angular.z = (error_yaw < ANGULAR_TOLERANCE) ? 0.0 : kp_yaw * error_yaw;
 
     static const double kp_distance = 0.5;
     msg.linear.x = (error_distance < LINEAR_TOLERANCE)
                        ? 0.0
                        : kp_distance * error_distance;
 
-    // DEBUG
-    // clamp
-    if (msg.linear.x < LINEAR_BASE * 0.5)
-      msg.linear.x = LINEAR_BASE * 0.5;
-    // end DEBUG
-
-    if (/*error_yaw < ANGULAR_TOLERANCE &&*/ error_distance <
-        LINEAR_TOLERANCE) {
+    if (error_yaw < ANGULAR_TOLERANCE && error_distance < LINEAR_TOLERANCE) {
       RCLCPP_INFO(this->get_logger(),
                   "Moved robot within tolerance of `cart_frame`. Stopping");
       listen_to_robot_base_cart_ = false;

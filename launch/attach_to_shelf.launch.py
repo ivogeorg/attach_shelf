@@ -16,9 +16,9 @@ def generate_launch_description():
     ros2_pkg = "attach_shelf"
 
     # DeclareLaunchArgument
-    obstacle_arg = DeclareLaunchArgument("obstacle", default_value=TextSubstitution(text="0.45"))
+    obstacle_arg = DeclareLaunchArgument("obstacle", default_value=TextSubstitution(text="0.30"))
     degrees_arg = DeclareLaunchArgument("degrees", default_value=TextSubstitution(text="-90.0"))
-    final_approach_arg = DeclareLaunchArgument("final_approach", default_value=TextSubstitution(text="false"))
+    final_approach_arg = DeclareLaunchArgument("final_approach", default_value=TextSubstitution(text="true"))
 
     # LaunchConfiguration
     obstacle_f = LaunchConfiguration('obstacle')
