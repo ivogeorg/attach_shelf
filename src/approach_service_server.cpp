@@ -100,7 +100,7 @@ private:
 
   const double LINEAR_TOLERANCE = 0.04;  // m
   const double ANGULAR_TOLERANCE = 0.07; // rad
-  const double LINEAR_BASE = 0.075;      // m/s
+  const double LINEAR_BASE = 0.1;      // m/s
   const double ANGULAR_BASE = 0.04;      // rad/s
 
   /**
@@ -123,6 +123,15 @@ private:
    * @see method move() uses as parameter
    */
   enum class MotionDirection { FORWARD, BACKWARD };
+
+  /**
+   * @brief Linear distance the robot should correct for.
+   * Before the robot rotates to orient itself toward the
+   * origin of `cart_frame`, it should move forward the
+   * distance between `robot_base_frame` and
+   * `robot_front_laser_base_link`.
+   */
+  const double BASE_LINK_TO_LASER_LINK = 0.21; // m
 
 public:
   ApproachServiceServer();
@@ -178,7 +187,7 @@ private:
   void broadcaster_cb();
   std::tuple<double, double, double>
   solve_sas_triangle(double left_side, double right_side, double sas_angle);
-  void move(double dist_m, MotionDirection dir);
+  void move(double dist_m, MotionDirection dir, double speed);
 };
 
 /**
@@ -415,7 +424,7 @@ void ApproachServiceServer::service_callback(
 
   // 4. Move the robot 30 cm forward and stop
   RCLCPP_INFO(this->get_logger(), "Moving under shelf");
-  move(0.3, MotionDirection::FORWARD);
+  move(0.3, MotionDirection::FORWARD, LINEAR_BASE * 0.5);
 
   // 5. Lift the elevator to attach to the cart/shelf
   RCLCPP_INFO(this->get_logger(), "Attaching to shelf");
@@ -430,13 +439,16 @@ void ApproachServiceServer::service_callback(
 
 /**
  * @brief Simple linear motion
+ * A blocking call, not a fall-through, so don't use in
+ * callbacks.
  */
-void ApproachServiceServer::move(double dist_m, MotionDirection dir) {
+void ApproachServiceServer::move(double dist_m, MotionDirection dir,
+                                 double speed) {
 
   // Use straight /odom)
   geometry_msgs::msg::Twist twist;
   twist.linear.x =
-      (dir == MotionDirection::FORWARD) ? LINEAR_BASE : -LINEAR_BASE;
+      (dir == MotionDirection::FORWARD) ? speed : -speed;
   double dist = 0.0, x, y;
   while (abs(dist + LINEAR_TOLERANCE) < dist_m) {
     vel_pub_->publish(twist);
@@ -517,30 +529,29 @@ void ApproachServiceServer::listener_cb() {
     // NOTE: These have to be fall-through
 
     // TODO: Should factor in the result of "degrees" argument,
-    //       that is, the robot yaw at the beginning of the 
-    //       approach should be taken into consideration to 
+    //       that is, the robot yaw at the beginning of the
+    //       approach should be taken into consideration to
     //       make sure the robot approaches without bumping into
     //       the cart and also moves straight in underneath it
 
     switch (approach_stage_) {
     case ApproachStage::LINEAR_CORRECTION:
-        // get `robot_base_link` to move forward the length
-        // of the x offset of `robot_front_laser_base_link`
-        break;
+      // get `robot_base_link` to move forward the length
+      // of the x offset of `robot_front_laser_base_link`
+      break;
     case ApproachStage::INIT_ROTATION:
-        // get robot to face along a straight line to 
-        // `cart_frame` using yaw_correction_
-        break;
+      // get robot to face along a straight line to
+      // `cart_frame` using yaw_correction_
+      break;
     case ApproachStage::LINEAR_APPROACH:
-        // get `robot_base_link` to coincide with `cart_frame`
-        // (translational x and y only) by using TF between them
-        break;
+      // get `robot_base_link` to coincide with `cart_frame`
+      // (translational x and y only) by using TF between them
+      break;
     case ApproachStage::FINAL_ROTATION:
-        // get the robot to face straight in along the length
-        // of the shelf (should be -yaw_correction_)
-        break;
+      // get the robot to face straight in along the length
+      // of the shelf (should be -yaw_correction_)
+      break;
     }
-
 
     // listen for TF `robot_base_link`->`cart_frame`
     std::string parent_frame = "robot_base_link";
@@ -578,8 +589,8 @@ void ApproachServiceServer::listener_cb() {
 
     // DEBUG
     // clamp
-    if (msg.linear.x < 0.075)
-      msg.linear.x = 0.075;
+    if (msg.linear.x < LINEAR_BASE * 0.5)
+      msg.linear.x = LINEAR_BASE * 0.5;
     // end DEBUG
 
     if (/*error_yaw < ANGULAR_TOLERANCE &&*/ error_distance <

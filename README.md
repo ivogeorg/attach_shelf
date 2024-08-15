@@ -52,9 +52,8 @@ _Optional_
 4. Timer for velocity publisher.
 5. Server for service `/approach_shelf` (custom `GoToLanding.srv`).
 6. Client to service `/approach_shelf` (custom `GoToLanding.srv`).  
-7. Publisher to `/elevator_up` (`std_msgs/msg/Empty`).  
-8. Publisher to `/elevator_down` (`std_msgs/msg/Empty`).  
-9. Transform listener.
+7. Publisher to `/elevator_up` (`std_msgs/msg/String`).  
+8. Transform listener.
 
 ##### 3. Adding a frame
 
@@ -227,7 +226,7 @@ At `obstacle=0.45`, robot can reach `cart_frame` without complex computations:
 ##### 4. `tf2_ros::TransformListener` for precision movement
 
 1. Use a `TransformListener` with `cart_frame` and `robot_base_footprint` frame of the robot to issue precision commands for the final approach.
-
+2. Correct the pose of the robot before approach. Since the main linear approach will be guided by the TF between `robot_base_link` and `cart_frame`, but `cart_frame` was originally defined relative to `robot_front_laser_base_link`, the robot should travel forward along the `x` dimension (because the two frames are aligned) the distance between `robot_base_link` and `robot_front_laser_base_link`, which is `0.21` as can be seen in the [xacro file used to spawn the RB1 robot](xacro/rb1_ros2_base.urdf.xacro).
 
 ##### 5. Parametrizing the laser scanner
 
