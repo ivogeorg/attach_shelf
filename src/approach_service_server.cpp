@@ -74,6 +74,7 @@ private:
   bool have_odom_;
   sensor_msgs::msg::LaserScan last_laser_;
   nav_msgs::msg::Odometry last_odom_;
+  double last_yaw_;
 
   const double REFLECTIVE_INTENSITY_VALUE = 8000; // for reflective points
   const int POINT_DIST_THRESHOLD = 10;            // for point set segmentation
@@ -99,7 +100,7 @@ private:
   rclcpp::TimerBase::SharedPtr broadcaster_timer_;
 
   const double LINEAR_TOLERANCE = 0.04;  // m
-  const double ANGULAR_TOLERANCE = 0.07; // rad
+  const double ANGULAR_TOLERANCE = 0.01; // rad
   const double LINEAR_BASE = 0.1;        // m/s
   const double ANGULAR_BASE = 0.04;      // rad/s
 
@@ -115,7 +116,7 @@ private:
   };
   ApproachStage approach_stage_;
 
-  double yaw_correction_;
+  //   double yaw_correction_;
 
   /**
    * @class MotionDirection
@@ -154,6 +155,9 @@ private:
    */
   inline void odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
     last_odom_ = *msg;
+    last_yaw_ = yaw_from_quaternion(
+        last_odom_.pose.pose.orientation.x, last_odom_.pose.pose.orientation.y,
+        last_odom_.pose.pose.orientation.z, last_odom_.pose.pose.orientation.w);
     have_odom_ = true;
   }
 
@@ -188,6 +192,7 @@ private:
   std::tuple<double, double, double>
   solve_sas_triangle(double left_side, double right_side, double sas_angle);
   void move(double dist_m, MotionDirection dir, double speed);
+  void turn(double angle_rad, double speed);
 };
 
 /**
@@ -315,8 +320,8 @@ void ApproachServiceServer::service_callback(
   // 2.3 Solve SAS triangle
   // To get x, y, and yaw of `cart_frame`
   // yaw will be used in TF listener for approach
-  double x_offset, y_offset;
-  std::tie(x_offset, y_offset, yaw_correction_) =
+  double x_offset, y_offset, yaw_correction;
+  std::tie(x_offset, y_offset, yaw_correction) =
       solve_sas_triangle(left_range, right_range, sas_angle);
 
   // 2.4 Get TF odom_laser_t_
@@ -405,22 +410,34 @@ void ApproachServiceServer::service_callback(
   }
 
   // 3. Move the frame `robot_base_link` to `cart_frame`, facing straight in
-  rclcpp::sleep_for(3s); // Wait for `cart_frame` TF to start broadcasting
 
-  // 3.1 Listen for TF `robot_base_link`->`cart_frame`
+  // TODO: Linear correction of 0.21 before yaw.
+
+  // 3.1 Turn toward `cart_frame`
+  RCLCPP_INFO(this->get_logger(), "Facing shelf");
+  turn(yaw_correction, ANGULAR_BASE);
+
+  //   rclcpp::sleep_for(3s); // Wait for `cart_frame` TF to start broadcasting
+
+  // 3.2 Listen for TF `robot_base_link`->`cart_frame`
   RCLCPP_INFO(this->get_logger(), "Approaching shelf");
   listen_to_robot_base_cart_ = true;
 
-  // 3.2 Wait for robot to move to `cart_frame`
+  // 3.3 Wait for robot to move to `cart_frame`
+  // Listener will set to false when goal reached
   while (listen_to_robot_base_cart_)
     ;
 
-  // 3.3 Stop broadcasting `cart_frame`
+  // 3.4 Stop broadcasting `cart_frame`
   broadcast_odom_cart_ = false;
 
-  // 3.4 Stop listening and broadcasting
+  // 3.5 Stop listening and broadcasting
   listener_timer_->cancel();
   broadcaster_timer_->cancel();
+
+  // 3.6 Straighten out
+  RCLCPP_INFO(this->get_logger(), "Straightening out");
+  turn(-yaw_correction, ANGULAR_BASE);
 
   // 4. Move the robot 30 cm forward and stop
   RCLCPP_INFO(this->get_logger(), "Moving under shelf");
@@ -448,6 +465,7 @@ void ApproachServiceServer::move(double dist_m, MotionDirection dir,
   // Use straight /odom)
   geometry_msgs::msg::Twist twist;
   twist.linear.x = (dir == MotionDirection::FORWARD) ? speed : -speed;
+  twist.angular.z = 0.0;
   double dist = 0.0, x, y;
   while (abs(dist + LINEAR_TOLERANCE) < dist_m) {
     vel_pub_->publish(twist);
@@ -457,6 +475,42 @@ void ApproachServiceServer::move(double dist_m, MotionDirection dir,
     y = last_odom_.pose.pose.position.y;
     dist += sqrt(pow(x, 2.0) + pow(y, 2.0));
   }
+  // Stop robot
+  twist.linear.x = 0.0;
+  vel_pub_->publish(twist);
+}
+
+void ApproachServiceServer::turn(double angle_rad, double speed) {
+  double last_angle = last_yaw_;
+  double turn_angle = 0;
+  double goal_angle = angle_rad;
+  geometry_msgs::msg::Twist twist;
+
+  while ((goal_angle > 0 &&
+          (abs(turn_angle + ANGULAR_TOLERANCE) < abs(goal_angle))) ||
+         (goal_angle < 0 && (abs(turn_angle - ANGULAR_TOLERANCE) <
+                             abs(goal_angle)))) { // need to turn (more)
+    RCLCPP_DEBUG(this->get_logger(), "Turning goal %f rad, turn angle = %f rad",
+                 goal_angle, turn_angle);
+    twist.linear.x = 0.0;
+    twist.angular.z = (goal_angle > 0) ? speed : -speed;
+    vel_pub_->publish(twist);
+
+    double temp_yaw = last_yaw_;
+    double delta_angle = normalize_angle(temp_yaw - last_angle);
+
+    turn_angle += delta_angle;
+    last_angle = temp_yaw;
+  }
+  // reached goal angle within tolerance, stop turning
+  //   RCLCPP_DEBUG(this->get_logger(), "Resulting yaw %f", last_yaw_);
+  //   RCLCPP_DEBUG(this->get_logger(), "Stopping rotation, angle = %f deg",
+  //                turn_angle * RAD2DEG);
+  // Stop robot
+  RCLCPP_DEBUG(this->get_logger(),
+               "Done turning, turn angle = %f rad. Stopping", turn_angle);
+  twist.angular.z = 0.0;
+  vel_pub_->publish(twist);
 }
 
 /**
