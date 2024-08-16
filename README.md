@@ -25,10 +25,26 @@ An RB1 robot in a simulated warehouse world moves forward, turns, detects a shel
 
 ##### 2. Task 2 - Final approach
 
-
-
-**TODO**  
-
+1. Launching
+   ```
+   cd ~/ros2_ws/src
+   git clone https://github.com/ivogeorg/attach_shelf.git
+   checkout checkpoint-9-all
+   cd ~/ros2_ws
+   colcon build --packages-select attach_shelf
+   source install/setup.bash
+   ros2 launch attach_shelf attach_to_shelf.launch.py obstacle:=0.30 degrees:=-90.0 final_approach:=true
+   ```
+2. Notes:
+   1. There is a strange left-wheel slip front left of the cart which requires a complex navigation algorithm to compensate for automatically.
+   2. The TF `cart_frame` remains published if `attach_to_shelf` is `false` but stops broadcasting once the robot reaches it if `attach_to_shelf` is `true`.
+   3. The notebook is incorrect in its instructions about publishing to the `/elevator_up` topic. It's not of type `std_msgs/msg/Empty` but `std_msgs/msg/String`.
+   4. Sending `msg.data=1` causes the shelf/cart to be attached to the robot. Interestingly, the robot doesn't have to be underneath; the shelf/cart will "jump" to where the robot is and get attached. I have tried not to cheat with that.
+   5. Due to the signature of `Node::create_subscription()`, where any callback group membership has to be indicated in the `SubscriptionOptions`, a simple derived class `CustomSubscriptionOptions` is used to initialize an options object with a callback group object and then passed to the topic subscription creators.
+3. Expected result
+   | Gazebo | Rviz2 |
+   | --- | --- |
+   | ![Cart attached](assets/attached_to_cart_gazebo.png) | ![Cart attached](assets/assets/attached_to_cart_rviz2.png) |  
 
 
 #### Implementation notes*
@@ -88,6 +104,26 @@ Need to add a frame in the middle of the reflective plates of the shelf.
      0.000  0.000  0.000  1.000
    ```  
 6. `cart_frame` will only have an `x` and a `y` component (and possibly a yaw) relative to `robot_front_laser_base_link`. So, these are two transforms, which need to be combined, by matrix multiplication (except we don't have a matrix for the latter) or some other way. _How to combine?_
+7. This is the SAS triangle diagram:
+   ```
+   /***********************************************************
+                frame_length
+     \------------|--y-->.------------------/
+      \rsa        |pi/2  .             lsa/
+       \          |     .               /
+        \         |     .             /
+         \        |    .            /                 +x
+          \    h/x|    .bisect    /
+           \      |   .         /                      ^
+      l_side\     |   .--ba   /r_side                  |
+             \    |---ha   \/                          |
+              \   |w .  \ /                    +yaw /--|--\ -yaw
+               \  |a.   /                           V  |  V
+                \ |y. /                      -y <----- | -----> +y
+                 \|./                        (in laser link frame)
+                  V - sas_angle
+   ***********************************************************/
+   ```
 
 | Gazebo | Rviz2 |
 | --- | --- |
@@ -546,4 +582,5 @@ Arguments (pass arguments as '<name>:=<value>'):
 3. There is no visual change to the robot, that is, anything like lifting its top up toward the shelf/cart above it.
    ![RB1 moving with cart on top](assets/rvb1_moving_with_cart.png)  
    ![RB1 moving with cart on top](assets/rb1_moving_with_cart-1.png)  
+4. Interestingly enough, the shelf/cart doesn't have to be on top of the RB1 robot to attach to it. It would actually "jump" to position when `elevator_up` is written to.
    

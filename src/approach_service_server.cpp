@@ -407,8 +407,10 @@ void ApproachServiceServer::service_callback(
   move(BASE_LINK_TO_LASER_LINK, MotionDirection::FORWARD, LINEAR_BASE * 0.5);
 
   // 3.1 Turn toward `cart_frame`
-  // Note: The robot consistently veers to the left of `cart_frame` (when starting from left).
-  //       Apply this correction to see if turning farther will stop the target misses.
+  // Note: The robot consistently veers to the left of `cart_frame` (when
+  // starting from left).
+  //       Apply this correction to see if turning farther will stop the target
+  //       misses.
   const double DRIFT_TURN_CORRECTION = 1.8;
   RCLCPP_INFO(this->get_logger(), "Facing shelf (incl. drift correction)");
   turn(yaw_correction * DRIFT_TURN_CORRECTION, ANGULAR_BASE);
@@ -435,7 +437,7 @@ void ApproachServiceServer::service_callback(
   double x_approach = base_cart_t_.transform.translation.x;
   double y_approach = base_cart_t_.transform.translation.y;
   double dist_approach = sqrt(pow(x_approach, 2.0) + pow(y_approach, 2.0));
-  
+
   move(dist_approach, MotionDirection::FORWARD, LINEAR_BASE * 0.75);
 
   // 3.7 Straighten out
@@ -750,10 +752,6 @@ ApproachServiceServer::solve_sas_triangle(double l_side, double r_side,
   //   RCLCPP_DEBUG(this->get_logger(), "x=%f, y=%f, h_angle=%f", x, y,
   //   h_angle);
 
-  // Note: See diagram above for sign of y
-  if (l_side < r_side)
-    y *= -1;
-
   // 3. Solve the SAS trinagle
   //    Given: l_side + rsa OR r_side + lsa, frame_length / 2.0
   //    Find:  b_angle, yaw = h_angle-b_angle
@@ -776,9 +774,27 @@ ApproachServiceServer::solve_sas_triangle(double l_side, double r_side,
   //   b_angle);
   yaw = h_angle - b_angle;
 
-  // Note: See diagram for sign of initial yaw
-  if (r_side > l_side)
-    yaw *= -1;
+  /***********************************************************
+                frame_length
+  \------------|--y-->.------------------/
+   \rsa        |pi/2  .             lsa/
+    \          |     .               /
+     \         |     .             /
+      \        |    .            /                 +x
+       \    h/x|    .bisect    /
+        \      |   .         /                      ^
+   l_side\     |   .--ba   /r_side                  |
+          \    |---ha   \/                          |
+           \   |w .  \ /                    +yaw /--|--\ -yaw
+            \  |a.   /                           V  |  V
+             \ |y. /                      -y <----- | -----> +y
+              \|./                        (in laser link frame)
+               V - sas_angle
+  ***********************************************************/
+
+  // Note: See diagram for signs of y and yaw
+  y = abs(y) * ((l_side > r_side) ? -1 : 1);
+  yaw = abs(yaw) * ((l_side > r_side) ? 1 : -1);
 
   /* NOTE:
      1. x and y are for positioning crate_frame, yaw is not used in TF
@@ -786,8 +802,6 @@ ApproachServiceServer::solve_sas_triangle(double l_side, double r_side,
 
      Essentially the TransformStamped's rotation will be ignored
   */
-
-  // TODO: Test thoroughly
 
   // Returning x_offset, y_offset, yaw
   //   RCLCPP_DEBUG(this->get_logger(),
