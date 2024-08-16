@@ -90,6 +90,7 @@ private:
   geometry_msgs::msg::TransformStamped odom_cart_t_;
   geometry_msgs::msg::TransformStamped odom_laser_t_;
   geometry_msgs::msg::TransformStamped laser_cart_t_;
+  geometry_msgs::msg::TransformStamped base_cart_t_;
 
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener>
@@ -430,8 +431,8 @@ void ApproachServiceServer::service_callback(
   RCLCPP_INFO(this->get_logger(), "Approaching shelf");
   listen_to_robot_base_cart_ = true;
 
-  // 3.3 Wait for robot to move to `cart_frame`
-  // Listener will set to false when goal reached
+  // 3.3 Wait for TF `base_cart_t_`
+  // Listener will set to false when transform recorded
   while (listen_to_robot_base_cart_)
     ;
 
@@ -442,7 +443,14 @@ void ApproachServiceServer::service_callback(
   listener_timer_->cancel();
   broadcaster_timer_->cancel();
 
-  // 3.6 Straighten out
+  // 3.6 Approach shelf using `base_cart_t_`
+  double x_approach = base_cart_t_.transform.translation.x;
+  double y_approach = base_cart_t_.transform.translation.y;
+  double dist_approach = sqrt(pow(x_approach, 2.0) + pow(y_approach, 2.0));
+  
+  move(dist_approach, MotionDirection::FORWARD, LINEAR_BASE);
+
+  // 3.7 Straighten out
   RCLCPP_INFO(this->get_logger(), "Straightening out");
   turn(-yaw_correction, ANGULAR_BASE);
 
@@ -485,6 +493,8 @@ void ApproachServiceServer::move(double dist_m, MotionDirection dir,
     x = last_odom_.pose.pose.position.x;
     y = last_odom_.pose.pose.position.y;
     dist += sqrt(pow(x - x_init, 2.0) + pow(y - y_init, 2.0));
+    x_init = x;
+    y_init = y;
   }
   // Stop robot
   RCLCPP_DEBUG(this->get_logger(), "Done moving, dist = %f m. Stopping", dist);
@@ -593,8 +603,8 @@ void ApproachServiceServer::listener_cb() {
     // listen for TF `robot_base_link`->`cart_frame`
     std::string parent_frame = "robot_base_link";
     std::string child_frame = cart_frame_;
-    // RCLCPP_DEBUG(this->get_logger(), "Listening for `%s`->`%s`",
-    //              parent_frame.c_str(), child_frame.c_str());
+    RCLCPP_DEBUG(this->get_logger(), "Listening for `%s`->`%s`",
+                 parent_frame.c_str(), child_frame.c_str());
     geometry_msgs::msg::TransformStamped t;
     try {
       t = tf_buffer_->lookupTransform(parent_frame, child_frame,
@@ -605,44 +615,47 @@ void ApproachServiceServer::listener_cb() {
       return;
     }
 
-    // move the robot toward cart_frame
-    double error_distance = sqrt(pow(t.transform.translation.x, 2) +
-                                 pow(t.transform.translation.y, 2));
-    RCLCPP_DEBUG(this->get_logger(), "listener_cb: delta_x = %f m",
-                 t.transform.translation.x);
-    RCLCPP_DEBUG(this->get_logger(), "listener_cb: error_distance = %f m",
-                 error_distance);
+    base_cart_t_ = t;
+    listen_to_robot_base_cart_ = false;
 
+    // // move the robot toward cart_frame
+    // double error_distance = sqrt(pow(t.transform.translation.x, 2) +
+    //                              pow(t.transform.translation.y, 2));
+    // RCLCPP_DEBUG(this->get_logger(), "listener_cb: delta_x = %f m",
+    //              t.transform.translation.x);
+    // RCLCPP_DEBUG(this->get_logger(), "listener_cb: error_distance = %f m",
+    //              error_distance);
+
+    // // double error_yaw =
+    // //     atan2(t.transform.translation.y, t.transform.translation.x);
     // double error_yaw =
-    //     atan2(t.transform.translation.y, t.transform.translation.x);
-    double error_yaw =
-        yaw_from_quaternion(t.transform.rotation.x, t.transform.rotation.y,
-                            t.transform.rotation.z, t.transform.rotation.w);
-    RCLCPP_DEBUG(this->get_logger(), "listener_cb: error_yaw = %f rad",
-                 error_yaw);
+    //     yaw_from_quaternion(t.transform.rotation.x, t.transform.rotation.y,
+    //                         t.transform.rotation.z, t.transform.rotation.w);
+    // RCLCPP_DEBUG(this->get_logger(), "listener_cb: error_yaw = %f rad",
+    //              error_yaw);
 
-    geometry_msgs::msg::Twist msg;
+    // geometry_msgs::msg::Twist msg;
 
-    // static const double kp_yaw = 0.05;
-    // msg.angular.z = (abs(error_yaw) < ANGULAR_TOLERANCE) ? 0.0 : kp_yaw *
-    // error_yaw;
+    // // static const double kp_yaw = 0.05;
+    // // msg.angular.z = (abs(error_yaw) < ANGULAR_TOLERANCE) ? 0.0 : kp_yaw *
+    // // error_yaw;
 
-    static const double kp_distance = 0.75;
-    msg.linear.x = (error_distance < LINEAR_TOLERANCE * 2.0)
-                       ? 0.0
-                       : kp_distance * error_distance;
+    // static const double kp_distance = 0.75;
+    // msg.linear.x = (error_distance < LINEAR_TOLERANCE * 2.0)
+    //                    ? 0.0
+    //                    : kp_distance * error_distance;
 
-    if (/*error_yaw < ANGULAR_TOLERANCE &&*/ error_distance <
-        LINEAR_TOLERANCE * 2.0) {
-      RCLCPP_INFO(this->get_logger(),
-                  "Moved robot within tolerance of `cart_frame`. Stopping");
-      listen_to_robot_base_cart_ = false;
-    } else {
-      RCLCPP_DEBUG(this->get_logger(),
-                   "Moving robot toward `cart_frame` (x=%f, z=%f)",
-                   msg.linear.x, msg.angular.z);
-      vel_pub_->publish(msg);
-    }
+    // if (/*error_yaw < ANGULAR_TOLERANCE &&*/ error_distance <
+    //     LINEAR_TOLERANCE * 2.0) {
+    //   RCLCPP_INFO(this->get_logger(),
+    //               "Moved robot within tolerance of `cart_frame`. Stopping");
+    //   listen_to_robot_base_cart_ = false;
+    // } else {
+    //   RCLCPP_DEBUG(this->get_logger(),
+    //                "Moving robot toward `cart_frame` (x=%f, z=%f)",
+    //                msg.linear.x, msg.angular.z);
+    //   vel_pub_->publish(msg);
+    // }
   }
 }
 
