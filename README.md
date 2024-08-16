@@ -44,7 +44,7 @@ An RB1 robot in a simulated warehouse world moves forward, turns, detects a shel
 3. Expected result
    | Gazebo | Rviz2 |
    | --- | --- |
-   | ![Cart attached](assets/attached_to_cart_gazebo.png) | ![Cart attached](assets/assets/attached_to_cart_rviz2.png) |  
+   | ![Cart attached](assets/attached_to_cart_gazebo.png) | ![Cart attached](assets/attached_to_cart_rviz2.png) |  
 
 
 #### Implementation notes*
