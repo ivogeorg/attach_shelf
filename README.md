@@ -112,7 +112,7 @@ Briefly, after the RB1 robot has completed the pre-approach, has faced the crate
 5. Use a `StaticTransformBroadcaster` to publish the TF between `odom` and `cart_frame`. By default, this is published once. 
 6. Proceed with the final approach.
 
-###### 3.3 Final strategy
+###### 3.3 Strategy after brainstorming
 
 **Note:** All in code. No hardcoding!  
 
@@ -227,6 +227,146 @@ At `obstacle=0.45`, robot can reach `cart_frame` without complex computations:
 
 1. Use a `TransformListener` with `cart_frame` and `robot_base_footprint` frame of the robot to issue precision commands for the final approach.
 2. Correct the pose of the robot before approach. Since the main linear approach will be guided by the TF between `robot_base_link` and `cart_frame`, but `cart_frame` was originally defined relative to `robot_front_laser_base_link`, the robot should travel forward along the `x` dimension (because the two frames are aligned) the distance between `robot_base_link` and `robot_front_laser_base_link`, which is `0.21` as can be seen in the [xacro file used to spawn the RB1 robot](xacro/rb1_ros2_base.urdf.xacro).
+3. Precision movement impossible with drifting `odom/` alone. Look at the following curve which should be a straight line as only `twist.linear.x` is non-zero:
+```
+[approach_shelf_service_server_node-1] [INFO] [1723821045.867948241] [approach_shelf_service_server_node]: Facing shelf
+[approach_shelf_service_server_node-1] [DEBUG] [1723821045.867976347] [approach_shelf_service_server_node]: Turning goal -0.177402 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.177999427] [approach_shelf_service_server_node]: Done turning, turn angle = -0.167685 rad. Stopping
+[approach_shelf_service_server_node-1] [INFO] [1723821050.178088714] [approach_shelf_service_server_node]: Approaching shelf
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.235157242] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.970213 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.235242511] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.970395 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.235272393] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.162756 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.235294622] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.727796, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.335098989] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.969543 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.335205083] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.969812 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.335228154] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.166941 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.335246967] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.727359, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.435108703] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.969058 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.435203106] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.969398 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.435222103] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.169893 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.435238035] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.727048, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.535098591] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.965476 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.535183547] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.965749 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.535200113] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.167109 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.535213499] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.724312, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.636371759] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.955244 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.636464956] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.955313 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.636491963] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.155189 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.636507694] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.716485, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.735103658] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.936957 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.735198605] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.936979 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.735217795] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.136205 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.735233826] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.702734, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.835137458] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.912663 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.835219296] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.913045 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.835237553] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.114726 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.835253748] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.684784, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.935139778] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.874568 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.935758391] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.876063 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.935791110] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.087078 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821050.935814381] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.657047, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.035099316] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.825127 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.035632817] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.827672 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.035659087] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.071019 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.035678365] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.620754, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.135104503] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.772894 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.135187029] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.776397 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.135215705] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.060013 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.135239651] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.582298, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.235129379] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.723856 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.235243788] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.728396 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.235267066] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.049951 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.235301822] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.546297, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.335102064] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.665056 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.335180271] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.670782 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.335200361] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.040934 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.335217314] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.503086, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.435127719] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.606691 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.435236627] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.613471 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.435261135] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.035429 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.435281358] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.460104, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.535128460] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.558758 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.535214377] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.566506 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.535248100] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.031259 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.535267693] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.424880, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.635126449] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.507998 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.635227591] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.516756 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.635253757] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.028703 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.635273973] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.387567, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.735144047] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.465699 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.735223598] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.475470 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.735242319] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.026318 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.735257421] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.356602, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.835128530] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.423901 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.835264070] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.434972 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.835288989] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.022675 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.835311558] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.326229, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.935105440] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.388800 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.935249940] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.401296 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.935279568] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.018103 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821051.935302570] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.300972, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.035124251] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.355402 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.035219365] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.369565 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.035243912] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.012808 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.035258709] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.277173, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.135146027] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.328086 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.135210455] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.343609 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.135225829] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.010514 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.135249608] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.257707, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.235143085] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.299225 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.235229176] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.316171 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.235246614] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.010490 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.235261579] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.237128, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.335209535] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.269846 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.335288833] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.288792 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.335306227] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.007812 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.335322407] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.216594, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.435171732] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.245975 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.435325927] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.266854 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.435359780] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.005496 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.435400607] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.200140, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.535165032] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.226066 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.535295960] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.248789 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.535325161] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.003815 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.535345537] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.186591, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.635109560] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.205016 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.635199054] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.229982 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.635224145] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.002245 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.635244333] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.172486, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.735123203] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.186445 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.735212125] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.213708 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.735235971] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.001035 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.735255852] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.160281, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.835159090] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.169233 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.835243257] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.198962 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.835262735] [approach_shelf_service_server_node]: listener_cb: error_yaw = 0.000050 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.835280738] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.149221, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.935136645] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.154531 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.935236240] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.186685 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.935258634] [approach_shelf_service_server_node]: listener_cb: error_yaw = -0.000705 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821052.935282623] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.140014, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821053.035202825] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.141952 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821053.035282336] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.176467 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821053.035304177] [approach_shelf_service_server_node]: listener_cb: error_yaw = -0.001301 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821053.035323889] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.132350, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821053.135140434] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.129482 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821053.135232621] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.166650 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821053.135256899] [approach_shelf_service_server_node]: listener_cb: error_yaw = -0.001884 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821053.135279732] [approach_shelf_service_server_node]: Moving robot toward `cart_frame` (x=0.124987, z=0.000000)
+[approach_shelf_service_server_node-1] [DEBUG] [1723821053.235124686] [approach_shelf_service_server_node]: listener_cb: delta_x = 0.118833 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821053.235209353] [approach_shelf_service_server_node]: listener_cb: error_distance = 0.158563 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821053.235238639] [approach_shelf_service_server_node]: listener_cb: error_yaw = -0.002433 rad
+[approach_shelf_service_server_node-1] [INFO] [1723821053.235259054] [approach_shelf_service_server_node]: Moved robot within tolerance of `cart_frame`. Stopping
+[approach_shelf_service_server_node-1] [INFO] [1723821053.235286327] [approach_shelf_service_server_node]: Straightening out
+[approach_shelf_service_server_node-1] [DEBUG] [1723821053.235309073] [approach_shelf_service_server_node]: Turning goal 0.177402 rad
+[approach_shelf_service_server_node-1] [DEBUG] [1723821056.946558923] [approach_shelf_service_server_node]: Done turning, turn angle = 0.167693 rad. Stopping
+[approach_shelf_service_server_node-1] [INFO] [1723821056.946654420] [approach_shelf_service_server_node]: Moving under shelf
+[approach_shelf_service_server_node-1] [DEBUG] [1723821056.946696232] [approach_shelf_service_server_node]: Linear motion goal 0.300000 m
+[approach_shelf_service_server_node-1] [DEBUG] [1723821057.103055585] [approach_shelf_service_server_node]: Done moving, dist = 0.280398 m. Stopping
+[approach_shelf_service_server_node-1] [INFO] [1723821057.103997161] [approach_shelf_service_server_node]: Attaching to shelf
+[approach_shelf_service_server_node-1] [INFO] [1723821057.104510992] [approach_shelf_service_server_node]: Final approach completed
+[pre_approach_v2_node-2] [INFO] [1723821057.104787266] [pre_approach_v2_node]: Final approach complete: 'true'
+```
 
 ##### 5. Parametrizing the laser scanner
 

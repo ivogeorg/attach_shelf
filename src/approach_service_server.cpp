@@ -102,7 +102,7 @@ private:
   const double LINEAR_TOLERANCE = 0.08;  // m
   const double ANGULAR_TOLERANCE = 0.01; // rad
   const double LINEAR_BASE = 0.1;        // m/s
-  const double ANGULAR_BASE = 0.1;      // rad/s
+  const double ANGULAR_BASE = 0.1;       // rad/s
 
   /**
    * @class ApproachStage
@@ -327,14 +327,16 @@ void ApproachServiceServer::service_callback(
   // 2.4 Get TF odom_laser_t_
   // `odom`->`robot_front_laser_base_link`
   listen_to_odom_laser_ = true; // Let the listner look up TF
-  RCLCPP_INFO(this->get_logger(), "Listening for `odom`->`robot_front_laser_base_link`");
+  RCLCPP_INFO(this->get_logger(),
+              "Listening for `odom`->`robot_front_laser_base_link`");
   rclcpp::sleep_for(3s); // Wait for the listener
 
   // Wait for odom_laser_t_ to be assigned by listener
   while (odom_laser_t_.header.frame_id.compare(odom_frame_) != 0)
     ;
 
-  RCLCPP_INFO(this->get_logger(), "Acquired TF `odom`->`robot_front_laser_base_link`");
+  RCLCPP_INFO(this->get_logger(),
+              "Acquired TF `odom`->`robot_front_laser_base_link`");
 
   RCLCPP_DEBUG(this->get_logger(), "odom_laser_t_.header.stamp=%d sec",
                odom_laser_t_.header.stamp.sec);
@@ -476,7 +478,7 @@ void ApproachServiceServer::move(double dist_m, MotionDirection dir,
   x_init = last_odom_.pose.pose.position.x;
   y_init = last_odom_.pose.pose.position.y;
   RCLCPP_DEBUG(this->get_logger(), "Linear motion goal %f m", dist_m);
-  while (abs(dist + LINEAR_TOLERANCE * 0.5) < dist_m) {
+  while (abs(dist + LINEAR_TOLERANCE * 0.25) < dist_m) {
     vel_pub_->publish(twist);
     // rclcpp::sleep_for(100ms);
 
@@ -485,8 +487,7 @@ void ApproachServiceServer::move(double dist_m, MotionDirection dir,
     dist += sqrt(pow(x - x_init, 2.0) + pow(y - y_init, 2.0));
   }
   // Stop robot
-  RCLCPP_DEBUG(this->get_logger(),
-               "Done moving, dist = %f m. Stopping", dist);
+  RCLCPP_DEBUG(this->get_logger(), "Done moving, dist = %f m. Stopping", dist);
   twist.linear.x = 0.0;
   twist.angular.z = 0.0;
   vel_pub_->publish(twist);
@@ -589,40 +590,6 @@ void ApproachServiceServer::listener_cb() {
     // 2. Use lookupTransform() to reach `cart_frame` in listener_cb()
     // 3. Rotate to 0 deg world coordinates in service_cb()
 
-    // TODO:
-    // Break into sections:
-    // - forward the length of the horizontal distance between base and laser
-    // - rotate toward cart_frame so there is no yaw to correct
-    // - forward toward cart_frame
-    // - rotate to perpendicular to cart_frame
-
-    // NOTE: These have to be fall-through
-
-    // TODO: Should factor in the result of "degrees" argument,
-    //       that is, the robot yaw at the beginning of the
-    //       approach should be taken into consideration to
-    //       make sure the robot approaches without bumping into
-    //       the cart and also moves straight in underneath it
-
-    // switch (approach_stage_) {
-    // case ApproachStage::LINEAR_CORRECTION:
-    //   // get `robot_base_link` to move forward the length
-    //   // of the x offset of `robot_front_laser_base_link`
-    //   break;
-    // case ApproachStage::INIT_ROTATION:
-    //   // get robot to face along a straight line to
-    //   // `cart_frame` using yaw_correction_
-    //   break;
-    // case ApproachStage::LINEAR_APPROACH:
-    //   // get `robot_base_link` to coincide with `cart_frame`
-    //   // (translational x and y only) by using TF between them
-    //   break;
-    // case ApproachStage::FINAL_ROTATION:
-    //   // get the robot to face straight in along the length
-    //   // of the shelf (should be -yaw_correction_)
-    //   break;
-    // }
-
     // listen for TF `robot_base_link`->`cart_frame`
     std::string parent_frame = "robot_base_link";
     std::string child_frame = cart_frame_;
@@ -641,27 +608,32 @@ void ApproachServiceServer::listener_cb() {
     // move the robot toward cart_frame
     double error_distance = sqrt(pow(t.transform.translation.x, 2) +
                                  pow(t.transform.translation.y, 2));
+    RCLCPP_DEBUG(this->get_logger(), "listener_cb: delta_x = %f m",
+                 t.transform.translation.x);
+    RCLCPP_DEBUG(this->get_logger(), "listener_cb: error_distance = %f m",
+                 error_distance);
 
-    // TODO: Derive from quaternion?
     // double error_yaw =
     //     atan2(t.transform.translation.y, t.transform.translation.x);
-    // double error_yaw =
-    //     yaw_from_quaternion(t.transform.rotation.x, t.transform.rotation.y,
-    //                         t.transform.rotation.z, t.transform.rotation.w);
+    double error_yaw =
+        yaw_from_quaternion(t.transform.rotation.x, t.transform.rotation.y,
+                            t.transform.rotation.z, t.transform.rotation.w);
+    RCLCPP_DEBUG(this->get_logger(), "listener_cb: error_yaw = %f rad",
+                 error_yaw);
 
     geometry_msgs::msg::Twist msg;
 
-    // static const double kp_yaw = 0.65;
-    // msg.angular.z = (error_yaw < ANGULAR_TOLERANCE) ? 0.0 : kp_yaw *
+    // static const double kp_yaw = 0.05;
+    // msg.angular.z = (abs(error_yaw) < ANGULAR_TOLERANCE) ? 0.0 : kp_yaw *
     // error_yaw;
 
     static const double kp_distance = 0.75;
-    msg.linear.x = (error_distance < LINEAR_TOLERANCE * 1.2)
+    msg.linear.x = (error_distance < LINEAR_TOLERANCE * 2.0)
                        ? 0.0
                        : kp_distance * error_distance;
 
     if (/*error_yaw < ANGULAR_TOLERANCE &&*/ error_distance <
-        LINEAR_TOLERANCE) {
+        LINEAR_TOLERANCE * 2.0) {
       RCLCPP_INFO(this->get_logger(),
                   "Moved robot within tolerance of `cart_frame`. Stopping");
       listen_to_robot_base_cart_ = false;
@@ -817,10 +789,12 @@ ApproachServiceServer::solve_sas_triangle(double l_side, double r_side,
   // TODO: Test thoroughly
 
   // Returning x_offset, y_offset, yaw
-//   RCLCPP_DEBUG(this->get_logger(),
-//                "Solve SAS triangle return: x=%f, y=%f, yaw=%f", x, y, yaw);
-  RCLCPP_INFO(this->get_logger(),
-               "`cart_frame` TF from `robot_front_laser_base_link`: x=%f, y=%f, yaw=%f", x, y, yaw);
+  //   RCLCPP_DEBUG(this->get_logger(),
+  //                "Solve SAS triangle return: x=%f, y=%f, yaw=%f", x, y, yaw);
+  RCLCPP_INFO(
+      this->get_logger(),
+      "`cart_frame` TF from `robot_front_laser_base_link`: x=%f, y=%f, yaw=%f",
+      x, y, yaw);
   return std::make_tuple(x, y, yaw);
 }
 
