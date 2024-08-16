@@ -106,20 +106,6 @@ private:
   const double ANGULAR_BASE = 0.1;       // rad/s
 
   /**
-   * @class ApproachStage
-   * @brief An enum type for the stages of the final approach.
-   */
-  enum class ApproachStage {
-    LINEAR_CORRECTION,
-    INIT_ROTATION,
-    LINEAR_APPROACH,
-    FINAL_ROTATION
-  };
-  ApproachStage approach_stage_;
-
-  //   double yaw_correction_;
-
-  /**
    * @class MotionDirection
    * @brief An enum type for the directions of motion.
    * @see method move() uses as parameter
@@ -234,8 +220,7 @@ ApproachServiceServer::ApproachServiceServer()
       tf_broadcaster_{std::make_shared<tf2_ros::TransformBroadcaster>(this)},
       broadcaster_timer_{this->create_wall_timer(
           100ms, std::bind(&ApproachServiceServer::broadcaster_cb, this),
-          cb_group_)},
-      approach_stage_{ApproachStage::LINEAR_CORRECTION} {
+          cb_group_)} {
   // TODO: Change to LINEAR_CORRECTION if included, either here or in
   // service_cb()
   RCLCPP_INFO(this->get_logger(), "Server of /approach_shelf service started");
@@ -419,11 +404,14 @@ void ApproachServiceServer::service_callback(
 
   // 3.0 Linear correction of 0.21
   RCLCPP_INFO(this->get_logger(), "Correcting for laser link");
-  move(BASE_LINK_TO_LASER_LINK, MotionDirection::FORWARD, LINEAR_BASE);
+  move(BASE_LINK_TO_LASER_LINK, MotionDirection::FORWARD, LINEAR_BASE * 0.5);
 
   // 3.1 Turn toward `cart_frame`
-  RCLCPP_INFO(this->get_logger(), "Facing shelf");
-  turn(yaw_correction, ANGULAR_BASE);
+  // Note: The robot consistently veers to the left of `cart_frame` (when starting from left).
+  //       Apply this correction to see if turning farther will stop the target misses.
+  const double DRIFT_TURN_CORRECTION = 1.8;
+  RCLCPP_INFO(this->get_logger(), "Facing shelf (incl. drift correction)");
+  turn(yaw_correction * DRIFT_TURN_CORRECTION, ANGULAR_BASE);
 
   //   rclcpp::sleep_for(3s); // Wait for `cart_frame` TF to start broadcasting
 
@@ -448,7 +436,7 @@ void ApproachServiceServer::service_callback(
   double y_approach = base_cart_t_.transform.translation.y;
   double dist_approach = sqrt(pow(x_approach, 2.0) + pow(y_approach, 2.0));
   
-  move(dist_approach, MotionDirection::FORWARD, LINEAR_BASE);
+  move(dist_approach, MotionDirection::FORWARD, LINEAR_BASE * 0.75);
 
   // 3.7 Straighten out
   RCLCPP_INFO(this->get_logger(), "Straightening out");
@@ -497,10 +485,10 @@ void ApproachServiceServer::move(double dist_m, MotionDirection dir,
     y_init = y;
   }
   // Stop robot
-  RCLCPP_DEBUG(this->get_logger(), "Done moving, dist = %f m. Stopping", dist);
   twist.linear.x = 0.0;
   twist.angular.z = 0.0;
   vel_pub_->publish(twist);
+  RCLCPP_DEBUG(this->get_logger(), "Done moving, dist = %f m. Stopping", dist);
 }
 
 void ApproachServiceServer::turn(double angle_rad, double speed) {
@@ -529,11 +517,11 @@ void ApproachServiceServer::turn(double angle_rad, double speed) {
   //   RCLCPP_DEBUG(this->get_logger(), "Stopping rotation, angle = %f deg",
   //                turn_angle * RAD2DEG);
   // Stop robot
-  RCLCPP_DEBUG(this->get_logger(),
-               "Done turning, turn angle = %f rad. Stopping", turn_angle);
   twist.linear.x = 0.0;
   twist.angular.z = 0.0;
   vel_pub_->publish(twist);
+  RCLCPP_DEBUG(this->get_logger(),
+               "Done turning, turn angle = %f rad. Stopping", turn_angle);
 }
 
 /**

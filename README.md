@@ -367,6 +367,7 @@ At `obstacle=0.45`, robot can reach `cart_frame` without complex computations:
 [approach_shelf_service_server_node-1] [INFO] [1723821057.104510992] [approach_shelf_service_server_node]: Final approach completed
 [pre_approach_v2_node-2] [INFO] [1723821057.104787266] [pre_approach_v2_node]: Final approach complete: 'true'
 ```
+4. Actually, the same happens without continous use of `lookupTransform`. The robot consistently misses the goal `cart_frame` on the left (if starting from the left).
 
 ##### 5. Parametrizing the laser scanner
 
