@@ -6,6 +6,7 @@
 #include "geometry_msgs/msg/twist.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp/utilities.hpp"
 #include "rcutils/logging.h"
 #include "sensor_msgs/msg/laser_scan.hpp"
 
@@ -166,7 +167,9 @@ private:
       twist.linear.x = 0.0;
       twist.angular.z = 0.0;
       timer_->cancel();
-      RCLCPP_INFO(this->get_logger(), "Pre-approach completed");
+      
+      RCLCPP_INFO(this->get_logger(), "Pre-approach completed. Terminating");
+      rclcpp::shutdown();
       break;
     default:
       RCLCPP_DEBUG(this->get_logger(), "Stopped");
