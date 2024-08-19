@@ -584,3 +584,7 @@ Arguments (pass arguments as '<name>:=<value>'):
    ![RB1 moving with cart on top](assets/rb1_moving_with_cart-1.png)  
 4. Interestingly enough, the shelf/cart doesn't have to be on top of the RB1 robot to attach to it. It would actually "jump" to position when `elevator_up` is written to.
    
+##### 9. Terminating a service
+
+1. Services are generally not terminated and/or restarted. It requires a whole _bring-up_ which might involve restarting the whole system.
+2. If necessary (and benign), short of using a lifecycle node (note: lc nodes not fully developed), one can use a separate `Trigger` or `Empty` call to a "shutdown" service in the main service node, the callback for which can do some basic cleanup and call `rclcpp::shutdown()` after some time, say, 5-10 s. 
