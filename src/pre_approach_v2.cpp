@@ -299,6 +299,8 @@ void RB1Approach::service_response_callback(
     final_approach_complete = result->complete;
     RCLCPP_INFO(this->get_logger(), "Final approach complete: '%s'",
                 final_approach_complete ? "true" : "false");
+    RCLCPP_INFO(this->get_logger(), "Terminating client");
+    rclcpp::shutdown();
   }
 }
 
