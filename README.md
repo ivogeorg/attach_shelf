@@ -12,6 +12,7 @@ An RB1 robot in a simulated warehouse world moves forward, turns, detects a shel
    ```
    cd ~/ros2_ws/src
    git clone https://github.com/ivogeorg/attach_shelf.git
+   checkout checkpoint-9-revised
    cd ~/ros2_ws
    colcon build --packages-select attach_shelf
    source install/setup.bash
@@ -29,7 +30,7 @@ An RB1 robot in a simulated warehouse world moves forward, turns, detects a shel
    ```
    cd ~/ros2_ws/src
    git clone https://github.com/ivogeorg/attach_shelf.git
-   checkout checkpoint-9-all
+   checkout checkpoint-9-revised
    cd ~/ros2_ws
    colcon build --packages-select attach_shelf
    source install/setup.bash
