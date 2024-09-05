@@ -109,6 +109,7 @@ RB1Approach::RB1Approach(int argc, char **argv)
       client_{this->create_client<GoToLoading>("approach_shelf")},
       motion_{Motion::FORWARD}, moving_forward_{true}, turning_{false},
       have_odom_{false}, have_scan_{false}, laser_scanner_parametrized_{false} {
+  RCLCPP_DEBUG(this->get_logger(), "Num args: %d", (argc - 1) / 2);
   wait_for_laser_scan_publisher();
   wait_for_odometery_publisher();
 
