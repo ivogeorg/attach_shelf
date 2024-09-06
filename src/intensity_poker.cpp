@@ -20,6 +20,7 @@ public:
   ~IntensityPoker() = default;
 
 private:
+  const int REFLECTIVE_INTENSITY_THRESHOLD = 3000;
   sensor_msgs::msg::LaserScan last_laser_;
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
   bool done_;
@@ -81,7 +82,8 @@ void IntensityPoker::laser_scan_callback(
     std::vector<std::pair<int, double>> reflective_points;
     int high_intensity_count = 0;
     for (int i = 0; i < static_cast<int>(last_laser_.intensities.size()); ++i) {
-      if (last_laser_.intensities[i] > intensities_avg) {
+      //   if (last_laser_.intensities[i] > intensities_avg) {
+      if (last_laser_.intensities[i] > REFLECTIVE_INTENSITY_THRESHOLD) {
         ++high_intensity_count;
         reflective_points.push_back(
             std::make_pair(i, last_laser_.intensities[i]));
@@ -96,7 +98,7 @@ void IntensityPoker::laser_scan_callback(
                 high_intensity_count);
 
     for (auto &p : reflective_points) {
-      std::cout << p.first << ' ';
+      std::cout << p.first << ':' << p.second << '\n';
     }
     std::cout << '\n' << std::flush;
 

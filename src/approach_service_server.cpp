@@ -76,8 +76,9 @@ private:
   nav_msgs::msg::Odometry last_odom_;
   double last_yaw_;
 
-  const double REFLECTIVE_INTENSITY_VALUE = 8000; // for reflective points
-  const int POINT_DIST_THRESHOLD = 10;            // for point set segmentation
+  const double REFLECTIVE_INTENSITY_VALUE = 8000;     // for reflective points
+  const double REFLECTIVE_INTENSITY_THRESHOLD = 3000; // for lab
+  const int POINT_DIST_THRESHOLD = 10; // for point set segmentation
 
   std::string odom_frame_;
   std::string laser_frame_;
@@ -204,8 +205,8 @@ ApproachServiceServer::ApproachServiceServer()
           "odom", 10,
           std::bind(&ApproachServiceServer::odometry_callback, this, _1),
           topic_pub_sub_options_)},
-      vel_pub_{this->create_publisher<geometry_msgs::msg::Twist>(
-          "/diffbot_base_controller/cmd_vel_unstamped", 1)},
+      vel_pub_{
+          this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 1)},
       elev_up_pub_{
           this->create_publisher<std_msgs::msg::String>("/elevator_up", 1)},
       have_scan_{false}, have_odom_{false}, odom_frame_{"odom"},
@@ -224,6 +225,11 @@ ApproachServiceServer::ApproachServiceServer()
   // TODO: Change to LINEAR_CORRECTION if included, either here or in
   // service_cb()
   RCLCPP_INFO(this->get_logger(), "Server of /approach_shelf service started");
+  auto param_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  param_desc.description = "Top frame of the robot, parent to the base link of the robot, and usually child of the world frame.";
+  this->declare_parameter<std::string>("odom_frame_id", "odom", param_desc);
+  get_parameter("odom_frame_id", odom_frame_);
+  RCLCPP_INFO(this->get_logger(), "odom_frame_id is: %s", odom_frame_.c_str());
 }
 
 /**
@@ -249,7 +255,8 @@ void ApproachServiceServer::service_callback(
   // 1. Detect reflective plates.
   std::vector<int> reflective_point_indices;
   for (int i = 0; i < static_cast<int>(last_laser_.intensities.size()); ++i)
-    if (last_laser_.intensities[i] == REFLECTIVE_INTENSITY_VALUE)
+    // if (last_laser_.intensities[i] == REFLECTIVE_INTENSITY_VALUE)
+    if (last_laser_.intensities[i] > REFLECTIVE_INTENSITY_THRESHOLD)
       reflective_point_indices.push_back(i);
 
   // 1.1 If none, return with complete=False
