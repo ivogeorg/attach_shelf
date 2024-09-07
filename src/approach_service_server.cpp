@@ -103,8 +103,8 @@ private:
 
   const double LINEAR_TOLERANCE = 0.08;  // m
   const double ANGULAR_TOLERANCE = 0.01; // rad
-  const double LINEAR_BASE = 0.5;        // m/s
-  const double ANGULAR_BASE = 0.1;       // rad/s
+  const double LINEAR_BASE = 0.1;        // m/s
+  const double ANGULAR_BASE = 0.05;       // rad/s
 
   /**
    * @class MotionDirection

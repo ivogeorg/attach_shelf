@@ -84,7 +84,7 @@ void LaserScannerPoker::laser_scan_callback(
     */
 
     for (int i = 0; i < size; ++i)
-        std::cout << i << ": " << last_laser_.ranges[i] << '\n';
+        std::cout << i << ": " << last_laser_.ranges[i] << "-->" << last_laser_.intensities[i] << '\n';
     std::cout << std::flush;
 
 
