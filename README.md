@@ -1,23 +1,26 @@
 Table of Contents
 =================
 
- * [attach_shelf](#attach_shelf)
+* [attach_shelf](#attach_shelf)
     * [Submission notes](#submission-notes)
-       * [1. Task 1 - Pre-approach](#1-task-1---pre-approach)
-       * [2. Task 2 - Final approach](#2-task-2---final-approach)
+    * [1. Task 1 - Pre-approach](#1-task-1---pre-approach)
+    * [2. Task 2 - Final approach](#2-task-2---final-approach)
     * [Implementation notes*](#implementation-notes)
-       * [1. Put robot back in initial state in Gazebo w/o restart](#1-put-robot-back-in-initial-state-in-gazebo-wo-restart)
-       * [2. ROS2 objects](#2-ros2-objects)
-       * [3. Adding a frame](#3-adding-a-frame)
-          * [3.1. Brainstorming](#31-brainstorming)
-          * [3.2 Brainstorming](#32-brainstorming)
-          * [3.3 Strategy after brainstorming](#33-strategy-after-brainstorming)
-       * [4. tf2_ros::TransformListener for precision movement](#4-tf2_rostransformlistener-for-precision-movement)
-       * [5. Parametrizing the laser scanner](#5-parametrizing-the-laser-scanner)
-       * [6. Logging](#6-logging)
-       * [7. Using parameters and arguments from launch file](#7-using-parameters-and-arguments-from-launch-file)
-       * [8. Attaching to the shelf/cart](#8-attaching-to-the-shelfcart)
-       * [9. Terminating a service](#9-terminating-a-service)
+    * [1. Put robot back in initial state in Gazebo w/o restart](#1-put-robot-back-in-initial-state-in-gazebo-wo-restart)
+    * [2. ROS2 objects](#2-ros2-objects)
+    * [3. Adding a frame](#3-adding-a-frame)
+        * [3.1. Brainstorming](#31-brainstorming)
+        * [3.2 Brainstorming](#32-brainstorming)
+        * [3.3 Strategy after brainstorming](#33-strategy-after-brainstorming)
+    * [4. tf2_ros::TransformListener for precision movement](#4-tf2_rostransformlistener-for-precision-movement)
+    * [5. Parametrizing the laser scanner](#5-parametrizing-the-laser-scanner)
+    * [6. Logging](#6-logging)
+    * [7. Using parameters and arguments from launch file](#7-using-parameters-and-arguments-from-launch-file)
+    * [8. Attaching to the shelf/cart](#8-attaching-to-the-shelfcart)
+    * [9. Terminating a service](#9-terminating-a-service)
+    * [10. Rewriting approach and attachment to cart](#10-rewriting-approach-and-attachment-to-cart)
+        * [10.1 Notes](#101-notes)
+        * [10.2 Sequence of actions](#102-sequence-of-actions)
 
 <!-- Created by https://github.com/ekalinin/github-markdown-toc -->
 
@@ -615,3 +618,24 @@ Arguments (pass arguments as '<name>:=<value>'):
 
 1. Services are generally not terminated and/or restarted. It requires a whole _bring-up_ which might involve restarting the whole system.
 2. If necessary (and benign), short of using a lifecycle node (note: lc nodes not fully developed), one can use a separate `Trigger` or `Empty` call to a "shutdown" service in the main service node, the callback for which can do some basic cleanup and call `rclcpp::shutdown()` after some time, say, 5-10 s. 
+
+##### 10. Rewriting approach and attachment to cart
+
+###### 10.1 Notes
+
+1. Service name will be `/cart_pick_up`.  
+2. The general approach is to first align the robot's centroid with the lengthwise axis of the cart. This means that the distances to the reflective plates are equal. Then rotate to face along the midpoint between the plates and begin the approach. Possibly use the two supporting rods behind the plates to maintain alignment.
+
+###### 10.2 Sequence of actions
+
+1. _Broadcast a static TF from `map` to `load_pos_tf` using a composition of TF from `map` to `robot_base_footprint` and an all-zero TF `robot_base_footprint` to `load_pos_tf`._
+1. Identify the reflective plates. _Note that the intensity values vary with ambient light. In the original location, `intensities[i] > 3000` works, but not universally._
+2. Identify the smaller and larger distances to the two plates. _Technically, these are the ranges of the rightmost ray of the left plate and the leftmost ray of the right plate._
+3. To align, go very slowly forward (`linear.x = 0.05`) and to the farther plate (`angular.z = 0.1`) until the distances are **equal**.
+4. Turn (the other way) until the ray indices are equally displaced on both sides of `front = 541`. _This means the robot is facing along the lengthwise axis of the cart._
+5. _Broadcast a static TF from `map` to `cart_frame_front_midpoint` using a TF composition between `map` and `robot_front_laser_base_link` and a TF from `robot_front_laser_base_link` to `cart_frame_front_midpoint` with the distance to the midpoint and all-zeros for the rest._
+6. _Broadcast a static TF from `map` to `cart_frame_centerpoint` using a TF composition between `map` and `cart_frame_front_midpoint` and a TF `robot_frame_front_midpoint` and `robot_frame_centerpoint` with an approximation of the cart half-length and all-zeros for the rest._
+7. Approach the cart by using TF between `robot_base_footprint` and `cart_frame_front_midpoint` until tolerance.
+8. Go under the cart by using TF between `cart_frame_front_midpoint` and `cart_frame_centerpoint` until tolerance. _Optionally, use the reflections to the supporting rods behind the reflective plates for alignment corrections._
+9. Pick up the cart.
+10. Back up to `load_pos_tf`.
