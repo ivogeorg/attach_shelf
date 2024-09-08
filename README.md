@@ -1,3 +1,26 @@
+Table of Contents
+=================
+
+      * [attach_shelf](#attach_shelf)
+         * [Submission notes](#submission-notes)
+            * [1. Task 1 - Pre-approach](#1-task-1---pre-approach)
+            * [2. Task 2 - Final approach](#2-task-2---final-approach)
+         * [Implementation notes*](#implementation-notes)
+            * [1. Put robot back in initial state in Gazebo w/o restart](#1-put-robot-back-in-initial-state-in-gazebo-wo-restart)
+            * [2. ROS2 objects](#2-ros2-objects)
+            * [3. Adding a frame](#3-adding-a-frame)
+               * [3.1. Brainstorming](#31-brainstorming)
+               * [3.2 Brainstorming](#32-brainstorming)
+               * [3.3 Strategy after brainstorming](#33-strategy-after-brainstorming)
+            * [4. tf2_ros::TransformListener for precision movement](#4-tf2_rostransformlistener-for-precision-movement)
+            * [5. Parametrizing the laser scanner](#5-parametrizing-the-laser-scanner)
+            * [6. Logging](#6-logging)
+            * [7. Using parameters and arguments from launch file](#7-using-parameters-and-arguments-from-launch-file)
+            * [8. Attaching to the shelf/cart](#8-attaching-to-the-shelfcart)
+            * [9. Terminating a service](#9-terminating-a-service)
+
+<!-- Created by https://github.com/ekalinin/github-markdown-toc -->
+
 ### attach_shelf
 
 An RB1 robot in a simulated warehouse world moves forward, turns, detects a shelf, moves underneath it and attaches to it by raising its elevator.
