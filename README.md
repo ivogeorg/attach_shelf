@@ -578,12 +578,15 @@ Arguments (pass arguments as '<name>:=<value>'):
 
 ##### 8. Attaching to the shelf/cart
 
-1. The topic is `/elevator_up` and is of type `std_msgs::msg::String`.
-2. Need to send "data: `1`" on the command line but from the python code in [`attach_client.py`](scripts/attach_client.py) it looks like in will be `msg.data = 1`.
-3. There is no visual change to the robot, that is, anything like lifting its top up toward the shelf/cart above it.
+1. The topic is `/elevator_up` and is of type `std_msgs::msg::String`. The reverse has the logical topic `/elevator_down`.
+2. Need to send "data: `1`" on the command line but from the python code in [`attach_client.py`](scripts/attach_client.py) it looks like `msg.data = 1`. An empty string works, too:
+   ```
+   ros2 topic pub --once /elevator_up std_msgs/msg/String "{}"
+   ```
+4. There is no visual change to the robot in the simulator, that is, anything like lifting its top up toward the shelf/cart above it. The lifting and setting down of the cart is clearly visible in the lab. It takes about 3.5 seconds to lift or set down completely.
    ![RB1 moving with cart on top](assets/rvb1_moving_with_cart.png)  
    ![RB1 moving with cart on top](assets/rb1_moving_with_cart-1.png)  
-4. Interestingly enough, the shelf/cart doesn't have to be on top of the RB1 robot to attach to it. It would actually "jump" to position when `elevator_up` is written to.
+5. Interestingly enough, the shelf/cart doesn't have to be on top of the RB1 robot to attach to it. It would actually "jump" to position when `elevator_up` is written to.
    
 ##### 9. Terminating a service
 
