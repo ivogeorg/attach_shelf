@@ -609,7 +609,7 @@ Arguments (pass arguments as '<name>:=<value>'):
    ```
    ros2 topic pub --once /elevator_up std_msgs/msg/String "{}"
    ```
-4. There is no visual change to the robot in the simulator, that is, anything like lifting its top up toward the shelf/cart above it. The lifting and setting down of the cart is clearly visible in the lab. It takes about 3.5 seconds to lift or set down completely.
+4. There is visual change in that a white band appears in the middle of the robot in the simulator, and the cart may turn a bit. Also, anomalously, the cart **flips** so that the reflective plates go on the other side (closer to the desk). The lifting and setting down of the cart is clearly visible in the lab. It takes about 5 seconds to lift or set down completely.
    ![RB1 moving with cart on top](assets/rvb1_moving_with_cart.png)  
    ![RB1 moving with cart on top](assets/rb1_moving_with_cart-1.png)  
 5. Interestingly enough, the shelf/cart doesn't have to be on top of the RB1 robot to attach to it. It would actually "jump" to position when `elevator_up` is written to.
@@ -639,3 +639,15 @@ Arguments (pass arguments as '<name>:=<value>'):
 8. Go under the cart by using TF between `cart_frame_front_midpoint` and `cart_frame_centerpoint` until tolerance. _Optionally, use the reflections to the supporting rods behind the reflective plates for alignment corrections._
 9. Pick up the cart.
 10. Back up to `load_pos_tf`.
+
+###### 10.3 Simulator anomalies
+
+1. When approaching the cart, with only forward motion set (`teleop` or `cmd_vel`) the robot turns to the left and has to be corrected!ll
+2. When the robot picks up the cart, the cart flips so that the reflective plates are on the other side.
+3. When decreasing/increasing speeds in `teleop`, the robot moves.
+4. Once picked up and set down, subsequent commands to `/elevator_*` don't have a "physical" effect.
+
+###### 10.4 Lab observations
+
+1. There are 3 frames, `robot_cart_laser`, `robot_cart_laser_noisy`, and `robot_cart_laser_noisy_0`, which are set where `cart_frame` is meant to be set, and when the robot is facing the cart straight in. It appears and then fades, then appears again, possibly being published dynamically and going stale, and then published again.
+
