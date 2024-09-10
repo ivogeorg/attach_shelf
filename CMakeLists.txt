@@ -30,6 +30,7 @@ endif()
 
 rosidl_generate_interfaces(${PROJECT_NAME}
 	"srv/GoToLoading.srv"
+	"srv/PickUpCart.srv"
 	# DEPENDENCIES sensor_msgs geometry_msgs
 )
 
@@ -48,6 +49,9 @@ ament_target_dependencies(intensity_poker_node rclcpp sensor_msgs)
 add_executable(approach_shelf_service_server_node src/approach_service_server.cpp)
 ament_target_dependencies(approach_shelf_service_server_node rclcpp geometry_msgs nav_msgs sensor_msgs tf2 tf2_ros std_msgs)
 
+add_executable(cart_pick_up_service_server_node src/cart_pick_up.cpp)
+ament_target_dependencies(cart_pick_up_service_server_node rclcpp geometry_msgs nav_msgs sensor_msgs tf2 tf2_ros std_msgs)
+
 # Get the typesupport target name
 rosidl_get_typesupport_target(typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
@@ -55,6 +59,7 @@ rosidl_get_typesupport_target(typesupport_target ${PROJECT_NAME} "rosidl_typesup
 # NOTE: CMake, no keywords (PRIVATE, PUBLIC) or all keywords (can't mix)
 target_link_libraries(pre_approach_v2_node ${typesupport_target})
 target_link_libraries(approach_shelf_service_server_node ${typesupport_target})
+target_link_libraries(cart_pick_up_service_server_node ${typesupport_target})
 
 install(TARGETS
 			pre_approach_node
@@ -62,6 +67,7 @@ install(TARGETS
 			laser_scanner_poker_node
 			intensity_poker_node
 			approach_shelf_service_server_node
+			cart_pick_up_service_server_node
 	DESTINATION lib/${PROJECT_NAME}
 )
 

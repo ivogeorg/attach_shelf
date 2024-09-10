@@ -66,16 +66,16 @@ def generate_launch_description():
     # ====
     # `/approach_shelf` service server node
     final_approach_node_sim = Node(
-        package='attach_shelf', executable='approach_shelf_service_server_node',
-        output='screen', name='approach_shelf_service_server_node', emulate_tty=True,
+        package='attach_shelf', executable='cart_pick_up_service_server_node',
+        output='screen', name='cart_pick_up_service_server_node', emulate_tty=True,
         parameters=[{'use_sim_time': use_sim_time_f}, attach_service_config_path_sim],
         remappings=[('/cmd_vel', '/diffbot_base_controller/cmd_vel_unstamped')],
         condition=IfCondition(use_sim_time_f)
     )
 
     final_approach_node_lab = Node(
-        package='attach_shelf', executable='approach_shelf_service_server_node',
-        output='screen', name='approach_shelf_service_server_node', emulate_tty=True,
+        package='attach_shelf', executable='cart_pick_up_service_server_node',
+        output='screen', name='cart_pick_up_service_server_node', emulate_tty=True,
         parameters=[{'use_sim_time': use_sim_time_f}, attach_service_config_path_lab],
         condition=UnlessCondition(use_sim_time_f)
     )
