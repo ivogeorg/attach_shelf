@@ -55,11 +55,11 @@ def generate_launch_description():
     # CONFIG
     # ======
     # attach service server node configuration
-    attach_service_config_file_name_sim = 'approach_service_server_node_sim.yaml'
-    attach_service_config_path_sim = PathJoinSubstitution([pkg_share_name, config_dir_name, attach_service_config_file_name_sim])
+    cart_pick_up_config_sim = 'cart_pick_up_config_sim.yaml'
+    cart_pick_up_config_path_sim = PathJoinSubstitution([pkg_share_name, config_dir_name, cart_pick_up_config_sim])
 
-    attach_service_config_file_name_lab = 'approach_service_server_node_lab.yaml'
-    attach_service_config_path_lab = PathJoinSubstitution([pkg_share_name, config_dir_name, attach_service_config_file_name_lab])
+    cart_pick_up_config_lab = 'cart_pick_up_config_lab.yaml'
+    cart_pick_up_config_path_lab = PathJoinSubstitution([pkg_share_name, config_dir_name, cart_pick_up_config_lab])
 
     # ====
     # NODE
@@ -67,16 +67,16 @@ def generate_launch_description():
     # `/approach_shelf` service server node
     final_approach_node_sim = Node(
         package='attach_shelf', executable='cart_pick_up_service_server_node',
-        output='screen', name='cart_pick_up_service_server_node', emulate_tty=True,
-        parameters=[{'use_sim_time': use_sim_time_f}, attach_service_config_path_sim],
+        output='screen', name='cart_pick_up_server', emulate_tty=True,
+        parameters=[{'use_sim_time': use_sim_time_f}, cart_pick_up_config_path_sim],
         remappings=[('/cmd_vel', '/diffbot_base_controller/cmd_vel_unstamped')],
         condition=IfCondition(use_sim_time_f)
     )
 
     final_approach_node_lab = Node(
         package='attach_shelf', executable='cart_pick_up_service_server_node',
-        output='screen', name='cart_pick_up_service_server_node', emulate_tty=True,
-        parameters=[{'use_sim_time': use_sim_time_f}, attach_service_config_path_lab],
+        output='screen', name='cart_pick_up_server', emulate_tty=True,
+        parameters=[{'use_sim_time': use_sim_time_f}, cart_pick_up_config_path_lab],
         condition=UnlessCondition(use_sim_time_f)
     )
 

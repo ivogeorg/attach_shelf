@@ -640,14 +640,38 @@ Arguments (pass arguments as '<name>:=<value>'):
 9. Pick up the cart.
 10. Back up to `load_pos_tf`.
 
-###### 10.3 Simulator anomalies
+###### 10.3 Adding frames
+
+1. `"load_pos_tf"`: Use `geometry_msgs/msg/PoseStamped` `loading_position` coordinates to create and publish TF `"map"`-`"load_pos_tf"`
+2. `"face_ship_pos_tf"`: Use `geometry_msgs/msg/PoseStamped` `face_shiping_position` coordinates to create and publish TF `"map"`-`"face_ship_pos_tf"`
+3. `"cart_frame_front_midpoint"`: Create `"map"`-`"cart_frame_front_midpoint"` by composing `"map"`-`"robot_front_laser_base_link"` and `"robot_front_laser_base_link"` with added coordinates of midpoint between edges of reflective plates. 
+4. `"cart_frame_centerpoint"`: Create `"map"`-`"cart_frame_centerpoint"` by composing `"map"`-`"cart_frame_front_midpoint"` and `"cart_frame_front_midpoint"` with added calculated distance between reflective plate midpoint and cart centerpoint.
+5. `"laser_origin_offset"`: Create `"map"`-`"laser_origin_offset"` by composint `"map"`-`"robot_base_footprint"` and `"robot_base_footprint"`-`"robot_front_laser_base_link"` without the `z` coordinate.
+
+###### 10.4 Uses of `lookupTransform`
+
+_**Goal:**_ `listener_cb` is on a _timer_ so that a changing transform is used to program motion dynamically. However, this makes the function cluttered and/or an `if..else` cascade. How can this be done elegantly?  
+
+1. Move forward to `"laser_origin_offset"`.
+2. Move forward to `"cart_frame_front_midpoint"`.
+3. Move forward to `"cart_frame_centerpoint"`.
+4. Move backward to `"load_pos_tf"` (with cart).
+5. Move backward to `"face_ship_pos_tf"` (without cart).
+
+_**Possible solution:**_  
+1. All of these have `"robot_base_footprint"` as parent frame.
+2. Can set _global_ `child_frame_id` externally to `listener_cb`.
+3. All motions are _linear_. Only have to correct for angle by setting `angular` in the opposite direction of the difference. _How to do this directly in the quaternion?_
+
+
+###### 10.5 Simulator anomalies
 
 1. When approaching the cart, with only forward motion set (`teleop` or `cmd_vel`) the robot turns to the left and has to be corrected!ll
 2. When the robot picks up the cart, the cart flips so that the reflective plates are on the other side.
 3. When decreasing/increasing speeds in `teleop`, the robot moves.
 4. Once picked up and set down, subsequent commands to `/elevator_*` don't have a "physical" effect.
 
-###### 10.4 Lab observations
+###### 10.6 Lab observations
 
 1. There are 3 frames, `robot_cart_laser`, `robot_cart_laser_noisy`, and `robot_cart_laser_noisy_0`, which are set where `cart_frame` is meant to be set, and when the robot is facing the cart straight in. It appears and then fades, then appears again, possibly being published dynamically and going stale, and then published again.
 

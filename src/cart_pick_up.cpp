@@ -189,7 +189,7 @@ private:
  * that topic subscribers can be properly added to it.
  */
 CartPickUp::CartPickUp()
-    : Node("cart_pick_up_service_server_node"),
+    : Node("cart_pick_up_server"),
       cb_group_{
           this->create_callback_group(rclcpp::CallbackGroupType::Reentrant)},
       topic_pub_sub_options_{cb_group_},
@@ -786,15 +786,15 @@ CartPickUp::solve_sas_triangle(double l_side, double r_side,
   \------------|--y-->.------------------/
    \rsa        |pi/2  .             lsa/
     \          |     .               /
-     \         |     .             /
-      \        |    .            /                 +x
-       \    h/x|    .bisect    /
-        \      |   .         /                      ^
-   l_side\     |   .--ba   /r_side                  |
-          \    |---ha   \/                          |
-           \   |w .  \ /                    +yaw /--|--\ -yaw
+     \         |     .             /               +x
+      \        |    .            /                 
+       \    h/x|    .bisect    /                    ^
+        \      |   .         /                      |
+   l_side\     |   .--ba   /r_side                 -|-
+          \    |---ha   \/                        / | \
+           \   |w .  \ /                    +yaw /  |  \ -yaw
             \  |a.   /                           V  |  V
-             \ |y. /                      -y <----- | -----> +y
+             \ |y. /                      -y <------|------> +y
               \|./                        (in laser link frame)
                V - sas_angle
   ***********************************************************/

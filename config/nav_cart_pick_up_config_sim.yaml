@@ -1,0 +1,6 @@
+cart_pick_up_server:
+  ros__parameters:
+    odom_frame_id: "odom"
+    laser_frame_id: "robot_front_laser_base_link"
+    root_frame: "map"
+
