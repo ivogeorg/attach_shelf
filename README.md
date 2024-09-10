@@ -642,11 +642,19 @@ Arguments (pass arguments as '<name>:=<value>'):
 
 ###### 10.3 Adding frames
 
-1. `"load_pos_tf"`: Use `geometry_msgs/msg/PoseStamped` `loading_position` coordinates to create and publish TF `"map"`-`"load_pos_tf"`
-2. `"face_ship_pos_tf"`: Use `geometry_msgs/msg/PoseStamped` `face_shiping_position` coordinates to create and publish TF `"map"`-`"face_ship_pos_tf"`
+1. `"load_pos_tf"`: Use `geometry_msgs/msg/PoseStamped` `"loading_position"` coordinates to create and publish TF `"map"`-`"load_pos_tf"`
+2. `"face_ship_pos_tf"`: Use `geometry_msgs/msg/PoseStamped` `"face_shiping_position"` coordinates to create and publish TF `"map"`-`"face_ship_pos_tf"`
 3. `"cart_frame_front_midpoint"`: Create `"map"`-`"cart_frame_front_midpoint"` by composing `"map"`-`"robot_front_laser_base_link"` and `"robot_front_laser_base_link"` with added coordinates of midpoint between edges of reflective plates. 
 4. `"cart_frame_centerpoint"`: Create `"map"`-`"cart_frame_centerpoint"` by composing `"map"`-`"cart_frame_front_midpoint"` and `"cart_frame_front_midpoint"` with added calculated distance between reflective plate midpoint and cart centerpoint.
 5. `"laser_origin_offset"`: Create `"map"`-`"laser_origin_offset"` by composint `"map"`-`"robot_base_footprint"` and `"robot_base_footprint"`-`"robot_front_laser_base_link"` without the `z` coordinate.
+
+| TF name | Parent frame | Composition frame | `PoseStamped` | Depends on robot | TF composition |
+| --- | --- | --- | --- | --- | --- |
+| `"load_pos_tf"` | `"map"` |  | `loading_position` | No | No |
+| `"face_ship_pos_tf"` | `"map"` | | `face_shipping_position` | No | No |
+| `"cart_frame_front_midpoint"` | `"map"` | `"robot_front_laser_base_link"` | | Yes | Yes |
+| `"cart_frame_centerpoint"` | `"map"` | `"cart_frame_front_midpoint"` | | No | Yes |
+
 
 ###### 10.4 Uses of `lookupTransform`
 
