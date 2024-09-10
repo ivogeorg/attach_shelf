@@ -1,5 +1,5 @@
-Table of Contents
 =================
+Table of Contents
 
 * [attach_shelf](#attach_shelf)
     * [Submission notes](#submission-notes)
@@ -664,9 +664,9 @@ _**Possible solution 1:**_
 3. All motions are _linear_. Only have to correct for angle by setting `angular` in the opposite direction of the difference. _How to do this directly in the quaternion?_
 
 _**Possible solution 2:**_
-1. Function `move` that takes direction, parent and child frames, velocity publisher and transform listener buffer, a `boolean &done`, and other parameters as necessary.
-2. Construct timer in the function, bind a lambda callback with `lookupTransform` and `twist`, and add to callback group.
-3. Wait on `done` until lambda sets it when the motion is complete (within tolerance).
+1. Function `move` that takes direction and linear speed, parent and child frames, velocity publisher and transform listener buffer, a `boolean &done`, and other parameters as necessary.
+2. Construct timer in the function, bind a lambda callback with `lookupTransform` and `twist`, and add timer to callback group.
+3. `move` blocks on `done` until lambda sets it when the motion is complete (within _tolerance_, which can be a parameter with a default).
 
 ###### 10.5 Simulator anomalies
 
