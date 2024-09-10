@@ -658,11 +658,15 @@ _**Goal:**_ `listener_cb` is on a _timer_ so that a changing transform is used t
 4. Move backward to `"load_pos_tf"` (with cart).
 5. Move backward to `"face_ship_pos_tf"` (without cart).
 
-_**Possible solution:**_  
+_**Possible solution 1:**_  
 1. All of these have `"robot_base_footprint"` as parent frame.
 2. Can set _global_ `child_frame_id` externally to `listener_cb`.
 3. All motions are _linear_. Only have to correct for angle by setting `angular` in the opposite direction of the difference. _How to do this directly in the quaternion?_
 
+_**Possible solution 2:**_
+1. Function `move` that takes direction, parent and child frames, velocity publisher and transform listener buffer, a `boolean &done`, and other parameters as necessary.
+2. Construct timer in the function, bind a lambda callback with `lookupTransform` and `twist`, and add to callback group.
+3. Wait on `done` until lambda sets it when the motion is complete (within tolerance).
 
 ###### 10.5 Simulator anomalies
 
