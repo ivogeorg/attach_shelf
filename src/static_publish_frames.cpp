@@ -112,6 +112,8 @@ void StaticPubFrames::send_transforms() {
             face_ship_pos, 
             tf_name_face_ship_pos_));
 
+  // wait for 3 seconds (2s were enough) for the TFs to register
+  rclcpp::sleep_for(3s);
 }
 
 int main(int argc, char **argv) {
@@ -119,7 +121,6 @@ int main(int argc, char **argv) {
 
   auto node = std::make_shared<StaticPubFrames>();
 
-  rclcpp::sleep_for(2s);
   rclcpp::shutdown();
 
   return 0;
