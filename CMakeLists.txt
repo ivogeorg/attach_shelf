@@ -52,11 +52,9 @@ ament_target_dependencies(approach_shelf_service_server_node rclcpp geometry_msg
 add_executable(cart_pick_up_service_server_node src/cart_pick_up.cpp)
 ament_target_dependencies(cart_pick_up_service_server_node rclcpp geometry_msgs nav_msgs sensor_msgs tf2 tf2_ros std_msgs)
 
-add_executable(static_tf_broadcaster_from_pose src/static_publish_frames.cpp)
+add_executable(static_tf_broadcaster_from_pose src/static_publish_frames.cpp src/tf_utils.cpp)
+target_include_directories(static_tf_broadcaster_from_pose PUBLIC include)
 ament_target_dependencies(static_tf_broadcaster_from_pose rclcpp geometry_msgs tf2 tf2_ros)
-
-add_executable(tf_utils src/tf_utils.cpp)
-ament_target_dependencies(tf_utils rclcpp geometry_msgs tf2 tf2_ros)
 
 # Get the typesupport target name
 rosidl_get_typesupport_target(typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
@@ -75,11 +73,11 @@ install(TARGETS
 			approach_shelf_service_server_node
 			cart_pick_up_service_server_node
 			static_tf_broadcaster_from_pose
-			tf_utils
 	DESTINATION lib/${PROJECT_NAME}
 )
 
 install(DIRECTORY
+			include
 			launch
 			config
 			rviz
