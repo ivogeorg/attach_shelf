@@ -81,6 +81,11 @@ void StaticPubFrames::send_transforms_from_poses() {
   rclcpp::sleep_for(3s);
 }
 
+void StaticPubFrames::send_transforms_from_composition() {
+    // TODO
+}
+
+
 int main(int argc, char **argv) {
   rclcpp::init(argc, argv);
 
