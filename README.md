@@ -1,5 +1,6 @@
-=================
-Table of Contents
+### `attach_shelf`
+
+# Table of Contents
 
 * [attach_shelf](#attach_shelf)
     * [Submission notes](#submission-notes)
@@ -646,7 +647,7 @@ Arguments (pass arguments as '<name>:=<value>'):
 2. `"face_ship_pos_tf"`: Use `geometry_msgs/msg/PoseStamped` `"face_shiping_position"` coordinates to create and publish TF `"map"`-`"face_ship_pos_tf"`
 3. `"cart_frame_front_midpoint"`: Create `"map"`-`"cart_frame_front_midpoint"` by composing `"map"`-`"robot_front_laser_base_link"` and `"robot_front_laser_base_link"` with added coordinates of midpoint between edges of reflective plates. 
 4. `"cart_frame_centerpoint"`: Create `"map"`-`"cart_frame_centerpoint"` by composing `"map"`-`"cart_frame_front_midpoint"` and `"cart_frame_front_midpoint"` with added calculated distance between reflective plate midpoint and cart centerpoint.
-5. `"laser_origin_offset"`: Create `"map"`-`"laser_origin_offset"` by composint `"map"`-`"robot_base_footprint"` and `"robot_base_footprint"`-`"robot_front_laser_base_link"` without the `z` coordinate.
+5. `"laser_origin_offset"`: Create `"map"`-`"laser_origin_offset"` by composing `"map"`-`"robot_base_footprint"` and `"robot_base_footprint"`-`"robot_front_laser_base_link"` without the `z` coordinate.
 
 | TF name | Parent frame | Composition frame | `PoseStamped` | Depends on robot | TF composition |
 | --- | --- | --- | --- | --- | --- |
