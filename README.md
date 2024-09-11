@@ -1,5 +1,6 @@
-=================
-Table of Contents
+### `attach_shelf`
+
+# Table of Contents
 
 * [attach_shelf](#attach_shelf)
     * [Submission notes](#submission-notes)
