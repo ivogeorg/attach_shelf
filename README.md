@@ -655,6 +655,13 @@ Arguments (pass arguments as '<name>:=<value>'):
 | `"cart_frame_front_midpoint"` | `"map"` | `"robot_front_laser_base_link"` | | Yes | Yes |
 | `"cart_frame_centerpoint"` | `"map"` | `"cart_frame_front_midpoint"` | | No | Yes |
 
+![Static TF from pose](assets/static_tf_from_pose.png)  
+
+Notes on screenshot above:
+1. Two static TFs `"tf_load_pos"` and `"tf_face_ship_pos"` are sent and visualized in Rviz2.
+2. The parent frame is `"map"`, so navigation needs to be running.
+3. The node containing the `StaticTransformBroadcaster` which publishes the TFs needs to sleep for 2 seconds before it terminates for the TFs to be registered.
+4. These TFs are to be used as targets for the robot to back up, from having picked up the cart and having set it down, respectively.
 
 ###### 10.4 Uses of `lookupTransform`
 
