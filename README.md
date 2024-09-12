@@ -657,6 +657,7 @@ Arguments (pass arguments as '<name>:=<value>'):
 | `"cart_frame_centerpoint"` | `"map"` | `"cart_frame_front_midpoint"` | | No | Yes |
 
 ![Static TF from pose](assets/static_tf_from_pose.png)  
+![Static TF from composition](assets/static_tf_laser_origin_offset_rviz2.png)   
 
 Notes on screenshot above:
 1. Two static TFs `"tf_load_pos"` and `"tf_face_ship_pos"` are sent and visualized in Rviz2.
