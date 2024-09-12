@@ -115,4 +115,16 @@ tf_stamped_from_root_frame_to_composition_frame_3d(
     std::string root_frame_id, std::string composition_frame_id,
     std::shared_ptr<tf2_ros::Buffer> tf_buffer);
 
+/**
+ * @brief
+ * @param root_frame_id
+ * @param composition_frame_id
+ * @param tf_buffer
+ * @return
+ */
+geometry_msgs::msg::TransformStamped
+tf_stamped_from_frame_to_frame_3d(std::string from_frame_id,
+                                  std::string to_frame_id,
+                                  std::shared_ptr<tf2_ros::Buffer> tf_buffer);
+
 #endif // TF_UTILS_HPP__

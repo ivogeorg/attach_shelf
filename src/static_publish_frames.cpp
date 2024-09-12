@@ -90,18 +90,19 @@ void StaticPubFrames::send_transforms_from_poses() {
 }
 
 void StaticPubFrames::send_transforms_from_composition() {
-  // TODO
-  // 1. Get TransformStamped root_frame_id->composition_frame_id
-  // 2. Fill out TransformStamped composition_frame_id->target_frame_id
+  geometry_msgs::msg::TransformStamped ts_msg_base_to_laser =
+      tf_stamped_from_frame_to_frame_3d(
+          "robot_base_footprint", "robot_front_laser_base_link", tf_buffer_);
 
   geometry_msgs::msg::TransformStamped ts_msg_left =
       tf_stamped_from_root_frame_to_composition_frame_3d(
-          "map", "robot_front_laser_base_link", tf_buffer_);
+          "map", "robot_base_footprint", tf_buffer_);
 
   geometry_msgs::msg::TransformStamped ts_msg_right =
       tf_stamped_from_composition_frame_to_target_frame_2d(
-          this->get_clock()->now(), "robot_front_laser_base_link",
-          "laser_origin_offset", 0.0, 0.0);
+          this->get_clock()->now(), "robot_base_footprint",
+          "laser_origin_offset", ts_msg_base_to_laser.transform.translation.x,
+          0.0);
 
   static_tf_broadcaster_->sendTransform(tf_stamped_from_composition(
       "map", ts_msg_left, "laser_origin_offset", ts_msg_right));
@@ -114,7 +115,7 @@ int main(int argc, char **argv) {
   rclcpp::init(argc, argv);
 
   auto node = std::make_shared<StaticPubFrames>();
-  //   node->send_transforms_from_poses();
+  node->send_transforms_from_poses();
   node->send_transforms_from_composition();
 
   rclcpp::shutdown();

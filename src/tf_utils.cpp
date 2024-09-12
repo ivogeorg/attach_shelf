@@ -188,25 +188,33 @@ tf_stamped_from_composition_frame_to_target_frame_2d(
 }
 
 geometry_msgs::msg::TransformStamped
-tf_stamped_from_root_frame_to_composition_frame_3d(
-    std::string root_frame_id, std::string composition_frame_id,
-    std::shared_ptr<tf2_ros::Buffer> tf_buffer) {
+tf_stamped_from_frame_to_frame_3d(std::string from_frame_id,
+                                  std::string to_frame_id,
+                                  std::shared_ptr<tf2_ros::Buffer> tf_buffer) {
   geometry_msgs::msg::TransformStamped ts_msg;
   while (ts_msg.header.frame_id == "") {
     try {
-      ts_msg = tf_buffer->lookupTransform(root_frame_id, composition_frame_id,
+      ts_msg = tf_buffer->lookupTransform(from_frame_id, to_frame_id,
                                           tf2::TimePointZero);
     } catch (const tf2::TransformException &ex) {
-      RCLCPP_ERROR(
-          rclcpp::get_logger("rclcpp"), "Could not transform from %s to %s: %s",
-          root_frame_id.c_str(), composition_frame_id.c_str(), ex.what());
+      RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
+                   "Could not transform from %s to %s: %s",
+                   from_frame_id.c_str(), to_frame_id.c_str(), ex.what());
       // return ts_msg;
     }
   }
   // TODO: needs work here
   RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
-              "TF from \"%s\" to \"%s\": x=%f, y=%f", root_frame_id.c_str(),
-              composition_frame_id.c_str(), ts_msg.transform.translation.x,
+              "TF from \"%s\" to \"%s\": x=%f, y=%f", from_frame_id.c_str(),
+              to_frame_id.c_str(), ts_msg.transform.translation.x,
               ts_msg.transform.translation.y);
   return ts_msg;
+}
+
+geometry_msgs::msg::TransformStamped
+tf_stamped_from_root_frame_to_composition_frame_3d(
+    std::string root_frame_id, std::string composition_frame_id,
+    std::shared_ptr<tf2_ros::Buffer> tf_buffer) {
+  return tf_stamped_from_frame_to_frame_3d(root_frame_id, composition_frame_id,
+                                           tf_buffer);
 }
