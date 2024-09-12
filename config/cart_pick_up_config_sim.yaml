@@ -3,4 +3,5 @@ cart_pick_up_server:
     odom_frame_id: "odom"
     laser_frame_id: "robot_front_laser_base_link"
     root_frame: "odom"
+    base_to_laser_x: 0.21
 
