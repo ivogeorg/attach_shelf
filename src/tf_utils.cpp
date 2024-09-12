@@ -17,8 +17,13 @@
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/transform_stamped.hpp"
 
+#include "rclcpp/rclcpp.hpp"
+#include "rclcpp/utilities.hpp"
+
 #include "tf2/LinearMath/Transform.h"
 #include "tf2/LinearMath/Vector3.h"
+#include "tf2/exceptions.h"
+#include "tf2_ros/buffer.h"
 
 // ///////////////// UTILITIES /////////////////
 geometry_msgs::msg::TransformStamped
@@ -84,9 +89,9 @@ geometry_msgs::msg::PoseStamped make_pose(builtin_interfaces::msg::Time stamp,
   return p;
 }
 
-geometry_msgs::msg::TransformStamped
-tf_stamped_from_composition(geometry_msgs::msg::TransformStamped left,
-                            geometry_msgs::msg::TransformStamped right) {
+geometry_msgs::msg::TransformStamped tf_stamped_from_composition(
+    std::string left_frame_id, geometry_msgs::msg::TransformStamped left,
+    std::string right_frame_id, geometry_msgs::msg::TransformStamped right) {
   geometry_msgs::msg::TransformStamped ts_msg;
 
   tf2::Transform t_left = transform_from_tf_stamped(left);
@@ -94,7 +99,36 @@ tf_stamped_from_composition(geometry_msgs::msg::TransformStamped left,
 
   tf2::Transform composition = t_left * t_right;
 
-  return tf_stamped_from_transform(composition);
+  //   RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
+  //               "Composition transform frame_id = \"%s\"",
+  //               composition.);
+  //   RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
+  //               "Composition ts_msg child_frame_id = \"%s\"",
+  //               ts_msg.child_frame_id.c_str());
+
+  ts_msg = tf_stamped_from_transform(composition);
+  ts_msg.header.stamp = right.header.stamp;
+  ts_msg.header.frame_id = left_frame_id;
+  ts_msg.child_frame_id = right_frame_id;
+
+  RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Left ts_msg frame_id = \"%s\"",
+              left.header.frame_id.c_str());
+  RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
+              "Left ts_msg child_frame_id = \"%s\"",
+              left.child_frame_id.c_str());
+  RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Right ts_msg frame_id = \"%s\"",
+              right.header.frame_id.c_str());
+  RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
+              "Right ts_msg child_frame_id = \"%s\"",
+              right.child_frame_id.c_str());
+  RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
+              "Composition ts_msg frame_id = \"%s\"",
+              ts_msg.header.frame_id.c_str());
+  RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
+              "Composition ts_msg child_frame_id = \"%s\"",
+              ts_msg.child_frame_id.c_str());
+
+  return ts_msg;
 }
 
 tf2::Transform
@@ -125,5 +159,54 @@ tf_stamped_from_transform(tf2::Transform tf) {
   ts_msg.transform.rotation.z = tf.getRotation().z();
   ts_msg.transform.rotation.w = tf.getRotation().w();
 
+  return ts_msg;
+}
+
+geometry_msgs::msg::TransformStamped
+tf_stamped_from_composition_frame_to_target_frame_2d(
+    builtin_interfaces::msg::Time stamp, std::string composition_frame_id,
+    std::string target_frame_id, double translation_x, double translation_y) {
+  geometry_msgs::msg::TransformStamped ts_msg;
+
+  ts_msg.header.stamp = stamp;
+  ts_msg.header.frame_id = composition_frame_id;
+  ts_msg.child_frame_id = target_frame_id;
+  ts_msg.transform.translation.x = translation_x;
+  ts_msg.transform.translation.y = translation_y;
+  ts_msg.transform.translation.y = 0.0;
+  ts_msg.transform.rotation.x = 0.0;
+  ts_msg.transform.rotation.y = 0.0;
+  ts_msg.transform.rotation.z = 0.0;
+  ts_msg.transform.rotation.w = 0.1;
+
+  RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "ts_msg frame_id = \"%s\"",
+              ts_msg.header.frame_id.c_str());
+  RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "ts_msg child_frame_id = \"%s\"",
+              ts_msg.child_frame_id.c_str());
+
+  return ts_msg;
+}
+
+geometry_msgs::msg::TransformStamped
+tf_stamped_from_root_frame_to_composition_frame_3d(
+    std::string root_frame_id, std::string composition_frame_id,
+    std::shared_ptr<tf2_ros::Buffer> tf_buffer) {
+  geometry_msgs::msg::TransformStamped ts_msg;
+  while (ts_msg.header.frame_id == "") {
+    try {
+      ts_msg = tf_buffer->lookupTransform(root_frame_id, composition_frame_id,
+                                          tf2::TimePointZero);
+    } catch (const tf2::TransformException &ex) {
+      RCLCPP_ERROR(
+          rclcpp::get_logger("rclcpp"), "Could not transform from %s to %s: %s",
+          root_frame_id.c_str(), composition_frame_id.c_str(), ex.what());
+      // return ts_msg;
+    }
+  }
+  // TODO: needs work here
+  RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
+              "TF from \"%s\" to \"%s\": x=%f, y=%f", root_frame_id.c_str(),
+              composition_frame_id.c_str(), ts_msg.transform.translation.x,
+              ts_msg.transform.translation.y);
   return ts_msg;
 }
