@@ -897,6 +897,10 @@ II.  Algorithm
      8 use `move` to reach "cart_frame_centerpoint"
 
 III. ROS2 elements required
-
+     - scan listener
+     - odom listener (optional)
+     - amcl_pose listener (optional)
+     - cmd_vel publisher
+     - transform listener
 
  *******************************/
