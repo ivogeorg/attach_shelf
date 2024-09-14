@@ -35,8 +35,9 @@
 using namespace std::chrono_literals;
 using PickUpCart = attach_shelf::srv::PickUpCart;
 using LaserScan = sensor_msgs::msg::LaserScan;
-using std::placeholders::_1;
-using std::placeholders::_2;
+using namespace std::placeholders;
+// using std::placeholders::_1;
+// using std::placeholders::_2;
 
 /**
  * @class CustomSubscriptionOptions
@@ -93,7 +94,8 @@ private:
   geometry_msgs::msg::TransformStamped laser_cart_t_;
   geometry_msgs::msg::TransformStamped base_cart_t_;
 
-  std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+  //   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+  std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener>
       tf_listener_; // TODO: Consider StaticTL
   rclcpp::TimerBase::SharedPtr listener_timer_;
@@ -104,7 +106,7 @@ private:
   const double LINEAR_TOLERANCE = 0.08;  // m
   const double ANGULAR_TOLERANCE = 0.01; // rad
   const double LINEAR_BASE = 0.1;        // m/s
-  const double ANGULAR_BASE = 0.05;       // rad/s
+  const double ANGULAR_BASE = 0.05;      // rad/s
 
   /**
    * @class MotionDirection
@@ -181,6 +183,13 @@ private:
   solve_sas_triangle(double left_side, double right_side, double sas_angle);
   void move(double dist_m, MotionDirection dir, double speed);
   void turn(double angle_rad, double speed);
+  enum class Direction { FORWARD, BACKWARD };
+  bool
+  go_to_frame(std::string origin_frame_id, std::string target_frame_id,
+              MotionDirection dir, double max_lin_speed, double max_ang_speed,
+              double lin_tolerance, double ang_tolerance,
+              std::shared_ptr<tf2_ros::Buffer> tf_buff,
+              rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr vel_pub);
 };
 
 /**
@@ -189,21 +198,18 @@ private:
  * that topic subscribers can be properly added to it.
  */
 CartApproach::CartApproach()
-    : Node("cart_pick_up_server"),
-      cb_group_{
-          this->create_callback_group(rclcpp::CallbackGroupType::Reentrant)},
+    : Node("cart_pick_up_server"), cb_group_{this->create_callback_group(
+                                       rclcpp::CallbackGroupType::Reentrant)},
       topic_pub_sub_options_{cb_group_},
       srv_{this->create_service<PickUpCart>(
           "cart_pick_up",
           std::bind(&CartApproach::service_callback, this, _1, _2),
           rmw_qos_profile_services_default, cb_group_)},
       scan_sub_{this->create_subscription<sensor_msgs::msg::LaserScan>(
-          "scan", 10,
-          std::bind(&CartApproach::laser_scan_callback, this, _1),
+          "scan", 10, std::bind(&CartApproach::laser_scan_callback, this, _1),
           topic_pub_sub_options_)},
       odom_sub_{this->create_subscription<nav_msgs::msg::Odometry>(
-          "odom", 10,
-          std::bind(&CartApproach::odometry_callback, this, _1),
+          "odom", 10, std::bind(&CartApproach::odometry_callback, this, _1),
           topic_pub_sub_options_)},
       vel_pub_{
           this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 1)},
@@ -213,20 +219,19 @@ CartApproach::CartApproach()
       laser_frame_{"robot_front_laser_base_link"}, cart_frame_{"cart_frame"},
       broadcast_odom_cart_{false}, listen_to_odom_laser_{false},
       listen_to_robot_base_cart_{false},
-      tf_buffer_{std::make_unique<tf2_ros::Buffer>(this->get_clock())},
+      tf_buffer_{std::make_shared<tf2_ros::Buffer>(this->get_clock())},
       tf_listener_{std::make_shared<tf2_ros::TransformListener>(*tf_buffer_)},
       listener_timer_{this->create_wall_timer(
-          100ms, std::bind(&CartApproach::listener_cb, this),
-          cb_group_)},
+          100ms, std::bind(&CartApproach::listener_cb, this), cb_group_)},
       tf_broadcaster_{std::make_shared<tf2_ros::TransformBroadcaster>(this)},
       broadcaster_timer_{this->create_wall_timer(
-          100ms, std::bind(&CartApproach::broadcaster_cb, this),
-          cb_group_)} {
+          100ms, std::bind(&CartApproach::broadcaster_cb, this), cb_group_)} {
   // TODO: Change to LINEAR_CORRECTION if included, either here or in
   // service_cb()
   RCLCPP_INFO(this->get_logger(), "Server of /pick_up_cart service started");
   auto param_desc = rcl_interfaces::msg::ParameterDescriptor{};
-  param_desc.description = "Top frame of the robot, parent to the base link of the robot, and usually child of the world frame.";
+  param_desc.description = "Top frame of the robot, parent to the base link of "
+                           "the robot, and usually child of the world frame.";
   this->declare_parameter<std::string>("odom_frame_id", "odom", param_desc);
   get_parameter("odom_frame_id", odom_frame_);
   RCLCPP_INFO(this->get_logger(), "odom_frame_id is: %s", odom_frame_.c_str());
@@ -472,8 +477,7 @@ void CartApproach::service_callback(
  * callbacks. Because it relaculates the distance at
  * each loop, the tolerance can be smaller.
  */
-void CartApproach::move(double dist_m, MotionDirection dir,
-                                 double speed) {
+void CartApproach::move(double dist_m, MotionDirection dir, double speed) {
 
   // Use straight /odom)
   geometry_msgs::msg::Twist twist;
@@ -539,8 +543,8 @@ void CartApproach::turn(double angle_rad, double speed) {
  * @param threshold the minimum distance between segments
  * @return A vector of vectors each holding a segment
  */
-std::vector<std::vector<int>>
-CartApproach::segment(std::vector<int> &v, const int threshold) {
+std::vector<std::vector<int>> CartApproach::segment(std::vector<int> &v,
+                                                    const int threshold) {
   std::vector<std::vector<int>> vector_set;
 
   std::sort(v.begin(), v.end());
@@ -683,7 +687,7 @@ void CartApproach::broadcaster_cb() {
  */
 std::tuple<double, double, double>
 CartApproach::solve_sas_triangle(double l_side, double r_side,
-                                          double sas_angle) {
+                                 double sas_angle) {
 
   /***********************************************************
                 frame_length
@@ -787,7 +791,7 @@ CartApproach::solve_sas_triangle(double l_side, double r_side,
    \rsa        |pi/2  .             lsa/
     \          |     .               /
      \         |     .             /               +x
-      \        |    .            /                 
+      \        |    .            /
        \    h/x|    .bisect    /                    ^
         \      |   .         /                      |
    l_side\     |   .--ba   /r_side                 -|-
@@ -862,7 +866,7 @@ int main(int argc, char **argv) {
 
 /*******************************
 Cart Approach
- 
+
 I.   Notes
      - facing straight in means the ranges of the two
        inner reflective plate edges are equal
@@ -883,7 +887,7 @@ II.  Algorithm
        or less toward the cart
      2 identify the plates, segment, and find the edges and <--|
        distances to the two inner edges (has to be dynamic)    |
-     3 more forward and turning toward the longer range        |
+     3 move forward and turning toward the longer range        |
        until the two edge ranges are equal                     |
      4 stop, broadcast "laser_origin_offset" and use `move`    |
        to reach it                                             |
@@ -904,3 +908,75 @@ III. ROS2 elements required
      - transform listener
 
  *******************************/
+
+bool CartApproach::go_to_frame(
+    std::string origin_frame_id, std::string target_frame_id,
+    MotionDirection dir, double max_lin_speed, double max_ang_speed,
+    double lin_tolerance, double ang_tolerance,
+    std::shared_ptr<tf2_ros::Buffer> tf_buff,
+    rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr vel_pub) {
+
+  bool done = false;
+  geometry_msgs::msg::TransformStamped tf_msg;
+
+  rclcpp::Rate loop_rate(10); // 10 Hz
+
+  while (!done) {
+    try {
+      tf_msg = tf_buff->lookupTransform(origin_frame_id, target_frame_id,
+                                           tf2::TimePointZero);
+    } catch (const tf2::TransformException &ex) {
+      RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
+                   "Could not transform %s to %s: %s", origin_frame_id.c_str(),
+                   target_frame_id.c_str(), ex.what());
+      break;
+    }
+    // move the robot toward target frame
+    double error_distance = std::hypotf(tf_msg.transform.translation.x,
+                                        tf_msg.transform.translation.y);
+    if (dir == MotionDirection::BACKWARD)
+      error_distance *= -1.0;
+
+    RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"),
+                 "(go_to_frame) TF Listener: error_distance = %f m",
+                 error_distance);
+
+    double error_yaw = yaw_from_quaternion(
+        tf_msg.transform.rotation.x, tf_msg.transform.rotation.y,
+        tf_msg.transform.rotation.z, tf_msg.transform.rotation.w);
+    RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"),
+                 "(go_to_frame) TF Listener: error_yaw = %f rad", error_yaw);
+
+    geometry_msgs::msg::Twist vel_msg;
+
+    static const double kp_yaw = 0.5;
+    static const double kp_distance = 0.5;
+    double base_speed;
+
+    if (abs(error_yaw) > ang_tolerance) { // correct angular first
+      vel_msg.linear.x = 0.0;
+      base_speed = kp_yaw * (-error_yaw);
+      if (base_speed > 0.0 && base_speed > max_ang_speed)
+        base_speed = max_ang_speed;
+      else if (base_speed < 0.0 && base_speed < -max_ang_speed)
+        base_speed = -max_ang_speed;
+      vel_msg.angular.z = base_speed;
+    } else if (error_distance > lin_tolerance) {
+      base_speed = kp_distance * error_distance;
+      if (base_speed > 0.0 && base_speed > max_lin_speed)
+        base_speed = max_lin_speed;
+      else if (base_speed < 0.0 && base_speed < -max_lin_speed)
+        base_speed = -max_lin_speed;
+      vel_msg.linear.x = base_speed;
+      vel_msg.angular.z = 0.0;
+    } else {
+      vel_msg.linear.x = 0.0;
+      vel_msg.angular.z = 0.0;
+      done = true;
+    }
+    vel_pub->publish(vel_msg);
+    loop_rate.sleep();
+  }
+
+  return done;
+}

@@ -52,6 +52,9 @@ ament_target_dependencies(approach_shelf_service_server_node rclcpp geometry_msg
 add_executable(cart_pick_up_service_server_node src/cart_pick_up.cpp)
 ament_target_dependencies(cart_pick_up_service_server_node rclcpp geometry_msgs nav_msgs sensor_msgs tf2 tf2_ros std_msgs)
 
+add_executable(cart_approach_test_node src/cart_approach.cpp)
+ament_target_dependencies(cart_approach_test_node rclcpp geometry_msgs nav_msgs sensor_msgs tf2 tf2_ros std_msgs)
+
 add_executable(static_tf_broadcaster_from_pose src/static_publish_frames.cpp src/tf_utils.cpp)
 target_include_directories(static_tf_broadcaster_from_pose PUBLIC include)
 ament_target_dependencies(static_tf_broadcaster_from_pose rclcpp geometry_msgs tf2 tf2_ros)
@@ -63,6 +66,7 @@ rosidl_get_typesupport_target(typesupport_target ${PROJECT_NAME} "rosidl_typesup
 # NOTE: CMake, no keywords (PRIVATE, PUBLIC) or all keywords (can't mix)
 target_link_libraries(pre_approach_v2_node ${typesupport_target})
 target_link_libraries(approach_shelf_service_server_node ${typesupport_target})
+target_link_libraries(cart_approach_test_node ${typesupport_target})
 target_link_libraries(cart_pick_up_service_server_node ${typesupport_target})
 
 install(TARGETS
@@ -73,6 +77,7 @@ install(TARGETS
 			approach_shelf_service_server_node
 			cart_pick_up_service_server_node
 			static_tf_broadcaster_from_pose
+			cart_approach_test_node
 	DESTINATION lib/${PROJECT_NAME}
 )
 

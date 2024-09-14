@@ -696,4 +696,6 @@ _**Possible solution 2:**_
 ###### 10.6 Lab observations
 
 1. There are 3 frames, `robot_cart_laser`, `robot_cart_laser_noisy`, and `robot_cart_laser_noisy_0`, which are set where `cart_frame` is meant to be set, and when the robot is facing the cart straight in. It appears and then fades, then appears again, possibly being published dynamically and going stale, and then published again.
+2. The `robot_front_laser_base_link` is rotated -180 deg around `x` in the simulator, but only -90 deg arounc `x` in the lab!
+
 
