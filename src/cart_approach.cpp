@@ -577,6 +577,15 @@ bool CartApproach::go_to_frame(
     // move the robot toward target frame
     double error_distance = std::hypotf(tf_msg.transform.translation.x,
                                         tf_msg.transform.translation.y);
+
+    // TODO: 
+    // TODO: 
+    // TODO: 
+    //
+    // When moving backward, what should be the sign of the angle?
+    // Backing up with the joystick feels counterintuitive, so 
+    // should test and study with backing up to `loading_poscition`
+    // and `face_shipping_position`
     if (dir == MotionDirection::BACKWARD)
       error_distance *= -1.0;
 
@@ -584,12 +593,14 @@ bool CartApproach::go_to_frame(
     //              "(go_to_frame) TF Listener: error_distance = %f m",
     //              error_distance);
 
-    double error_yaw = yaw_from_quaternion(
+    double error_yaw_align = yaw_from_quaternion(
         tf_msg.transform.rotation.x, tf_msg.transform.rotation.y,
         tf_msg.transform.rotation.z, tf_msg.transform.rotation.w);
 
+    double error_yaw_dir = atan2(tf_msg.transform.translation.y, tf_msg.transform.translation.x);
+
     // RCLCPP_DEBUG(this->get_logger(),
-    //              "(go_to_frame) TF Listener: error_yaw = %f rad", error_yaw);
+    //              "(go_to_frame) TF Listener: error_yaw_align = %f rad", error_yaw_align);
 
     geometry_msgs::msg::Twist vel_msg;
 
@@ -605,9 +616,25 @@ bool CartApproach::go_to_frame(
     // While there is still linear distance, angular.z should point
     // toward the origin of the target frame. When the linear is 
     // within tolerance, angular.z should align with the target frame.
-    if (abs(error_yaw) > ang_tolerance) { // correct angular first
+
+    // Note:
+    // To use the error_yaw_dir first to keep heading toward the goal position
+    // it is best to have both linear.x and angular.z non-zero, otherwise they
+    // will need to be applied angular.z first and then linear.x. This is 
+    // problematic because this motion is done in a loop and will require a
+    // mess of boolean variables or a full state machine.
+
+    // State machine at a rate of 10 Hz might do the job nicely and won't 
+    // require iterative tuning, which is impractical with the slow turnaround
+    // of the dev platform.
+
+    // States:
+    // STEER_DIR (angular.z): point toward the target position
+    // LINEAR (linear.x): move forward or backward as directed
+    // ALIGN_YAW (angular.z): match the rotation of the target frame 
+    if (abs(error_yaw_align) > ang_tolerance) { // correct angular first
       vel_msg.linear.x = 0.0;
-      base_speed = kp_yaw * (-error_yaw);
+      base_speed = kp_yaw * (-error_yaw_align);
       base_speed = clip_speed(base_speed, min_ang_speed, max_ang_speed);
       vel_msg.angular.z = base_speed;
     } else if (abs(error_distance) > lin_tolerance) {
@@ -621,8 +648,8 @@ bool CartApproach::go_to_frame(
       done = true;
     }
 
-    RCLCPP_DEBUG(this->get_logger(), "dist: %f, angle: %f, x=%f, z=%f",
-                 error_distance, error_yaw, vel_msg.linear.x,
+    RCLCPP_DEBUG(this->get_logger(), "dist: %f, align: %f, dir: %f, x=%f, z=%f",
+                 error_distance, error_yaw_align, error_yaw_dir, vel_msg.linear.x,
                  vel_msg.angular.z);
 
     if (!done)

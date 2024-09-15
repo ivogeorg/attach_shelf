@@ -673,8 +673,8 @@ _**Goal:**_ `listener_cb` is on a _timer_ so that a changing transform is used t
 1. Move forward to `"laser_origin_offset"`.
 2. Move forward to `"cart_frame_front_midpoint"`.
 3. Move forward to `"cart_frame_centerpoint"`.
-4. Move backward to `"load_pos_tf"` (with cart).
-5. Move backward to `"face_ship_pos_tf"` (without cart).
+4. Move backward to `"tf_load_pos"` (with cart).
+5. Move backward to `"tf_face_ship_pos"` (without cart). **Note that the first 0.3 m the robot has to move _straight back_ to clear the cart before it backs up (possibly not straight back) to "tf_face_ship_pos".**
 
 _**Possible solution 1:**_  
 1. All of these have `"robot_base_footprint"` as parent frame.
