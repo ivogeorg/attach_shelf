@@ -152,7 +152,8 @@ private:
   void move(double dist_m, MotionDirection dir, double speed); // TODO: ???
   void turn(double angle_rad, double speed);                   // TODO: ???
 
-  void rotate(double rad, RotationFrame frame = RotationFrame::ROBOT);
+  void rotate(double rad, double speed,
+              RotationFrame frame = RotationFrame::ROBOT);
 
   bool
   go_to_frame(std::string origin_frame_id, std::string target_frame_id,
@@ -241,9 +242,11 @@ void CartApproach::precise_autolocalization() {
   // 9. Rotate robot_yaw - rotation_sum
 }
 
-void CartApproach::rotate(double rad, RotationFrame frame) {
+void CartApproach::rotate(double rad, double speed, RotationFrame frame) {
 
   // TODO
+  // 1. Use rclcpp::Rate, not a timer (for encapsulation)
+  // 2. https://github.com/ivogeorg/robot_patrol/blob/main/src/go_to_pose_action.cpp
 }
 
 /**
