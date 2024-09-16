@@ -13,7 +13,9 @@
 #include <iostream>
 #include <tuple>
 
+#include "geometry_msgs/msg/detail/pose_with_covariance_stamped__struct.hpp"
 #include "geometry_msgs/msg/detail/transform_stamped__struct.hpp"
+#include "geometry_msgs/msg/pose_with_covariance_stamped.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "nav_msgs/msg/detail/odometry__struct.hpp"
 #include "nav_msgs/msg/odometry.hpp"
@@ -69,14 +71,22 @@ private:
 
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr
+      amcl_pose_sub_;
   std::string cmd_vel_topic_name_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr vel_pub_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr elev_up_pub_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr elev_down_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr
+      initialpose_pub_;
 
   bool have_scan_;
   bool have_odom_;
+  bool have_amcl_pose_;
+
   sensor_msgs::msg::LaserScan last_laser_;
   nav_msgs::msg::Odometry last_odom_;
+  geometry_msgs::msg::PoseWithCovarianceStamped last_amcl_pose_;
   double last_yaw_;
 
   const double REFLECTIVE_INTENSITY_VALUE = 8000;     // for reflective points
@@ -138,6 +148,8 @@ private:
   inline void
   laser_scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg);
   inline void odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg);
+  inline void amcl_pose_callback(
+      const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg);
 
   // cart utilities
   std::vector<std::vector<int>> segment(std::vector<int> &v,
@@ -199,12 +211,25 @@ CartApproach::CartApproach()
       odom_sub_{this->create_subscription<nav_msgs::msg::Odometry>(
           "odom", 10, std::bind(&CartApproach::odometry_callback, this, _1),
           topic_pub_sub_options_)},
+      amcl_pose_sub_{this->create_subscription<
+          geometry_msgs::msg::PoseWithCovarianceStamped>(
+          "amcl_pose", 10,
+          std::bind(&CartApproach::amcl_pose_callback, this, _1),
+          topic_pub_sub_options_)},
       cmd_vel_topic_name_{"/diffbot_base_controller/cmd_vel_unstamped"},
       vel_pub_{this->create_publisher<geometry_msgs::msg::Twist>(
           cmd_vel_topic_name_, 1)},
-      have_scan_{false}, have_odom_{false}, odom_frame_{"odom"},
-      laser_frame_{"robot_front_laser_base_link"}, cart_frame_{"cart_frame"},
-      tf_buffer_{std::make_shared<tf2_ros::Buffer>(this->get_clock())},
+      elev_up_pub_{
+          this->create_publisher<std_msgs::msg::String>("elevator_up", 1)},
+      elev_down_pub_{
+          this->create_publisher<std_msgs::msg::String>("elevator_down", 1)},
+      initialpose_pub_{
+          this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
+              "initialpose", 1)},
+      have_scan_{false}, have_odom_{false}, have_amcl_pose_{false},
+      odom_frame_{"odom"}, laser_frame_{"robot_front_laser_base_link"},
+      cart_frame_{"cart_frame"}, tf_buffer_{std::make_shared<tf2_ros::Buffer>(
+                                     this->get_clock())},
       tf_listener_{std::make_shared<tf2_ros::TransformListener>(*tf_buffer_)},
       static_tf_broadcaster_{
           std::make_shared<tf2_ros::StaticTransformBroadcaster>(this)},
@@ -237,6 +262,22 @@ CartApproach::odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
   have_odom_ = true;
 }
 
+/**
+ * @brief Callback for `amcl_pose` published by `amcl`
+ * @param msg Latest stamped robot pose with covariance
+ * Sensor fusion of odometry, lidar, and other scans. Far
+ * superior to `odom`. Runs within the `nav2` stack.
+ */
+inline void CartApproach::amcl_pose_callback(
+    const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg) {
+  last_amcl_pose_ = *msg;
+  have_amcl_pose_ = true;
+}
+
+/**
+ * @brief Callback for
+ * @param msg
+ */
 void CartApproach::precise_autolocalization() {
 
   // TODO
@@ -252,11 +293,13 @@ void CartApproach::precise_autolocalization() {
   // 9. Rotate robot_yaw - rotation_sum
 }
 
-void CartApproach::rotate(double rad, double speed, double angular_precision, RotationFrame frame) {
+void CartApproach::rotate(double rad, double speed, double angular_precision,
+                          RotationFrame frame) {
 
   // TODO
   // 1. Use rclcpp::Rate, not a timer (for encapsulation)
-  // 2. https://github.com/ivogeorg/robot_patrol/blob/main/src/go_to_pose_action.cpp
+  // 2.
+  // https://github.com/ivogeorg/robot_patrol/blob/main/src/go_to_pose_action.cpp
 }
 
 /**
