@@ -152,7 +152,17 @@ private:
   void move(double dist_m, MotionDirection dir, double speed); // TODO: ???
   void turn(double angle_rad, double speed);                   // TODO: ???
 
-  void rotate(double rad, double speed,
+  /**
+   * @brief Rotational-only robot motion, based on `twist.angular.z` messages
+   * @param rad Degrees to turn
+   * @param speed Speed of rotation in rad/s
+   * @param angular_precision Determines the accuracy of rotation
+   * @param frame World or robot frame
+   * Contains an internal loop and blocks until rotation complete. Publishes
+   * `geometry_msgs::msg::Twist` messages to topic `cmd_vel` or equivalent.
+   * Approaches the target angle depending on the sign so as never overshoot.
+   */
+  void rotate(double rad, double speed, double angular_precision,
               RotationFrame frame = RotationFrame::ROBOT);
 
   bool
@@ -242,7 +252,7 @@ void CartApproach::precise_autolocalization() {
   // 9. Rotate robot_yaw - rotation_sum
 }
 
-void CartApproach::rotate(double rad, double speed, RotationFrame frame) {
+void CartApproach::rotate(double rad, double speed, double angular_precision, RotationFrame frame) {
 
   // TODO
   // 1. Use rclcpp::Rate, not a timer (for encapsulation)
