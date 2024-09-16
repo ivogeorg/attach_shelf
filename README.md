@@ -27,7 +27,7 @@
 
 ### attach_shelf
 
-An RB1 robot in a simulated warehouse world moves forward, turns, detects a shelf, moves underneath it and attaches to it by raising its elevator.
+An RB1 robot in a warehouse world moves forward, turns, detects a shelf, moves underneath it and attaches to it by raising its elevator. Warehouse both simulated in Gazebo and a real physical playpen in the Barcelona office of The Construct.
 
 ![RB1 attaches to shelf](assets/rb1_attach_shelf.gif)  
 
@@ -699,3 +699,52 @@ _**Possible solution 2:**_
 2. The `robot_front_laser_base_link` is rotated -180 deg around `x` in the simulator, but only -90 deg arounc `x` in the lab!
 
 
+#### To do for warehouse warehouse project
+
+This package is used as a submodule in the [`warehouse_project`](https://github.com/ivogeorg/warehouse_project). It is undergoing a substantial rework.
+
+##### 1. `go_to_frame`
+
+1. Publisher to `/initialpose`.
+2. Subscription to `/amcl_pose`.
+3. `rotate()`.
+4. Precision autolocalization in C++.
+5. `go_to_frame`:
+   1. Add subtract robot_yaw from `error_yaw_dir`.
+   2. Introduce states `enum class PoseStages { STEER_DIR, GO_STRAIGHT, ALIGN_YAW, STOP };`
+      1. `STEER_DIR`: Use `error_yaw_dir` to turn the robot toward the target position (`angular.z` only).
+      2. `GO_STRAIGHT`: Use `error_distance` to go forward or backward depending on argument (`linear.x` only).
+      3. `ALIGN_YAW`: Use `error_yaw_align` to align the robot with the target frame (`angular.z` only).
+      4. `STOP`: All errors within tolerance. Stop the robot and exit.
+6. Test from current pose to `"laser_origin_offset"` (`MotionDirection::FORWARD`).
+7. Test from initial position to `"tf_face_ship_pos"` (`MotionDirection::FORWARD`).
+8. Test from shipping position to `"tf_face_ship_pos"` (`MotionDirection::BACKWARD`).
+
+##### 2. Face cart straight in
+
+Face the cart, broadcast `"cart_frame_front_midpoint"` and `"cart_frame_centerpoint"`.
+
+##### 3. Pick up the cart
+
+Without service, use the fixed frames in (2) to move in underneath the cart and pick it up.
+
+##### 4. Back up
+
+Use `"tf_load_pos"` to back up with the cart to where navigation can be switched to `BasicNavigator::goToPose()` again.
+
+##### 5. Services
+
+This package will serve 3 services to be used for moving carts from loading to shipping. `attach_shelf` should be renamed.
+
+###### Services  
+
+1. `"cart_pick_up"`
+2. `"cart_set_down"`
+3. `"back_up"` (with or without cart)
+
+###### Package name candidates
+
+1. `warehouse_services`
+2. `warehouse_cart`
+3. `cart_servicing`
+4. `warehouse_cart_servicing` *
