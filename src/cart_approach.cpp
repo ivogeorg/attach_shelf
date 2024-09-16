@@ -59,6 +59,10 @@ public:
  * @brief A multi-callback node implementing the final approach service.
  */
 class CartApproach : public rclcpp::Node {
+public:
+  CartApproach();
+  ~CartApproach() = default;
+
 private:
   rclcpp::CallbackGroup::SharedPtr cb_group_;
   CustomSubscriptionOptions topic_pub_sub_options_;
@@ -109,8 +113,8 @@ private:
 
   /**
    * @class MotionDirection
-   * @brief An enum type for the directions of motion.
-   * @see method move() uses as parameter
+   * @brief An enum type for the directions of linear motion.
+   * @see method go_to_frame() uses as parameter
    */
   enum class MotionDirection { FORWARD, BACKWARD };
 
@@ -123,32 +127,46 @@ private:
    */
   const double BASE_LINK_TO_LASER_LINK = 0.21; // m
 
-public:
-  CartApproach();
-  ~CartApproach() = default;
+  /**
+   * @class RotationFrame
+   * @brief An enum type for the frames of rotation.
+   * @see method rotate() uses as parameter
+   */
+  enum class RotationFrame { WORLD, ROBOT };
 
-private:
+  // callbacks
   inline void
   laser_scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg);
   inline void odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg);
-  inline double normalize_angle(double angle);
-  inline double yaw_from_quaternion(double x, double y, double z, double w);
 
+  // cart utilities
   std::vector<std::vector<int>> segment(std::vector<int> &v,
                                         const int threshold);
   std::tuple<double, double, double>
   solve_sas_triangle(double left_side, double right_side, double sas_angle);
-  void move(double dist_m, MotionDirection dir, double speed);
-  void turn(double angle_rad, double speed);
-  enum class Direction { FORWARD, BACKWARD };
+
+  // navigation
+  void precise_autolocalization();
+
+  // motion
+  void move(double dist_m, MotionDirection dir, double speed); // TODO: ???
+  void turn(double angle_rad, double speed);                   // TODO: ???
+
+  void rotate(double rad, RotationFrame frame = RotationFrame::ROBOT);
+
   bool
   go_to_frame(std::string origin_frame_id, std::string target_frame_id,
               MotionDirection dir, double min_lin_speed, double max_lin_speed,
               double min_ang_speed, double max_ang_speed, double lin_tolerance,
               double ang_tolerance, std::shared_ptr<tf2_ros::Buffer> tf_buff,
               rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr vel_pub);
-  double clip_speed(double value, double min, double max);
 
+  // misc utilities
+  double clip_speed(double value, double min, double max);
+  inline double normalize_angle(double angle);
+  inline double yaw_from_quaternion(double x, double y, double z, double w);
+
+  // testing
   rclcpp::TimerBase::SharedPtr test_timer_;
   void test_cart_approach();
   void publish_laser_origin_offset();
@@ -206,6 +224,26 @@ CartApproach::odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
       last_odom_.pose.pose.orientation.x, last_odom_.pose.pose.orientation.y,
       last_odom_.pose.pose.orientation.z, last_odom_.pose.pose.orientation.w);
   have_odom_ = true;
+}
+
+void CartApproach::precise_autolocalization() {
+
+  // TODO
+  // 1. Need subscription to /amcl_pose
+  // 2. Need a publisher to /initialpose
+  // 3. Publish "init_position" to /initialpose
+  // 4. Get and record current robot_yaw (/amcl_pose)
+  // 5. Initialize rotation_sum
+  // 5. Until {x, y, z} covariances below 0.025
+  //    6. Rotate -180 deg and add to rotation_sum
+  //    7. Rotate 360 deg and add to rotation_sum
+  //    8. Rotate -180 deg and add to rotation_sum
+  // 9. Rotate robot_yaw - rotation_sum
+}
+
+void CartApproach::rotate(double rad, RotationFrame frame) {
+
+  // TODO
 }
 
 /**
@@ -578,12 +616,12 @@ bool CartApproach::go_to_frame(
     double error_distance = std::hypotf(tf_msg.transform.translation.x,
                                         tf_msg.transform.translation.y);
 
-    // TODO: 
-    // TODO: 
-    // TODO: 
+    // TODO:
+    // TODO:
+    // TODO:
     //
     // When moving backward, what should be the sign of the angle?
-    // Backing up with the joystick feels counterintuitive, so 
+    // Backing up with the joystick feels counterintuitive, so
     // should test and study with backing up to `loading_poscition`
     // and `face_shipping_position`
     if (dir == MotionDirection::BACKWARD)
@@ -597,10 +635,15 @@ bool CartApproach::go_to_frame(
         tf_msg.transform.rotation.x, tf_msg.transform.rotation.y,
         tf_msg.transform.rotation.z, tf_msg.transform.rotation.w);
 
-    double error_yaw_dir = atan2(tf_msg.transform.translation.y, tf_msg.transform.translation.x);
+    double error_yaw_dir =
+        atan2(tf_msg.transform.translation.y, tf_msg.transform.translation.x);
+    // TODO: subtract robot yaw in world frame (odom or amcl_pose)
+    // TODO: for amcl_pose, need to autolocalize accurately first (rotations in
+    // place)
 
     // RCLCPP_DEBUG(this->get_logger(),
-    //              "(go_to_frame) TF Listener: error_yaw_align = %f rad", error_yaw_align);
+    //              "(go_to_frame) TF Listener: error_yaw_align = %f rad",
+    //              error_yaw_align);
 
     geometry_msgs::msg::Twist vel_msg;
 
@@ -608,30 +651,29 @@ bool CartApproach::go_to_frame(
     static const double kp_distance = 1.0;
     double base_speed;
 
-
-    // TODO: 
-    // TODO: 
-    // TODO: 
+    // TODO:
+    // TODO:
+    // TODO:
     //
     // While there is still linear distance, angular.z should point
-    // toward the origin of the target frame. When the linear is 
+    // toward the origin of the target frame. When the linear is
     // within tolerance, angular.z should align with the target frame.
 
     // Note:
     // To use the error_yaw_dir first to keep heading toward the goal position
     // it is best to have both linear.x and angular.z non-zero, otherwise they
-    // will need to be applied angular.z first and then linear.x. This is 
+    // will need to be applied angular.z first and then linear.x. This is
     // problematic because this motion is done in a loop and will require a
     // mess of boolean variables or a full state machine.
 
-    // State machine at a rate of 10 Hz might do the job nicely and won't 
+    // State machine at a rate of 10 Hz might do the job nicely and won't
     // require iterative tuning, which is impractical with the slow turnaround
     // of the dev platform.
 
     // States:
     // STEER_DIR (angular.z): point toward the target position
     // LINEAR (linear.x): move forward or backward as directed
-    // ALIGN_YAW (angular.z): match the rotation of the target frame 
+    // ALIGN_YAW (angular.z): match the rotation of the target frame
     if (abs(error_yaw_align) > ang_tolerance) { // correct angular first
       vel_msg.linear.x = 0.0;
       base_speed = kp_yaw * (-error_yaw_align);
@@ -649,8 +691,8 @@ bool CartApproach::go_to_frame(
     }
 
     RCLCPP_DEBUG(this->get_logger(), "dist: %f, align: %f, dir: %f, x=%f, z=%f",
-                 error_distance, error_yaw_align, error_yaw_dir, vel_msg.linear.x,
-                 vel_msg.angular.z);
+                 error_distance, error_yaw_align, error_yaw_dir,
+                 vel_msg.linear.x, vel_msg.angular.z);
 
     if (!done)
       vel_pub->publish(vel_msg);
