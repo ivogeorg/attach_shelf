@@ -87,9 +87,10 @@ private:
   sensor_msgs::msg::LaserScan last_laser_;
   nav_msgs::msg::Odometry last_odom_;
   geometry_msgs::msg::PoseWithCovarianceStamped last_amcl_pose_;
-  double last_yaw_;
+  double last_yaw_odom_;
+  double last_yaw_amcl_;
 
-  const double REFLECTIVE_INTENSITY_VALUE = 8000;     // for reflective points
+  const double REFLECTIVE_INTENSITY_VALUE = 8000;     // for sim
   const double REFLECTIVE_INTENSITY_THRESHOLD = 3000; // for lab
   const int POINT_DIST_THRESHOLD = 10; // for point set segmentation
 
@@ -150,8 +151,9 @@ private:
   inline void odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg);
   inline void amcl_pose_callback(
       const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg);
+  inline double get_current_yaw();
 
-  // cart utilities
+  // cart service utilities
   std::vector<std::vector<int>> segment(std::vector<int> &v,
                                         const int threshold);
   std::tuple<double, double, double>
@@ -168,13 +170,13 @@ private:
    * @brief Rotational-only robot motion, based on `twist.angular.z` messages
    * @param rad Degrees to turn
    * @param speed Speed of rotation in rad/s
-   * @param angular_precision Determines the accuracy of rotation
+   * @param angular_tolerance Determines the accuracy of rotation
    * @param frame World or robot frame
    * Contains an internal loop and blocks until rotation complete. Publishes
    * `geometry_msgs::msg::Twist` messages to topic `cmd_vel` or equivalent.
    * Approaches the target angle depending on the sign so as never overshoot.
    */
-  void rotate(double rad, double speed, double angular_precision,
+  void rotate(double rad, double speed, double angular_tolerance,
               RotationFrame frame = RotationFrame::ROBOT);
 
   bool
@@ -256,7 +258,7 @@ inline void CartApproach::laser_scan_callback(
 inline void
 CartApproach::odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
   last_odom_ = *msg;
-  last_yaw_ = yaw_from_quaternion(
+  last_yaw_odom_ = yaw_from_quaternion(
       last_odom_.pose.pose.orientation.x, last_odom_.pose.pose.orientation.y,
       last_odom_.pose.pose.orientation.z, last_odom_.pose.pose.orientation.w);
   have_odom_ = true;
@@ -271,6 +273,9 @@ CartApproach::odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
 inline void CartApproach::amcl_pose_callback(
     const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg) {
   last_amcl_pose_ = *msg;
+  last_yaw_amcl_ = yaw_from_quaternion(
+      msg->pose.pose.orientation.x, msg->pose.pose.orientation.y,
+      msg->pose.pose.orientation.z, msg->pose.pose.orientation.w);
   have_amcl_pose_ = true;
 }
 
@@ -293,13 +298,109 @@ void CartApproach::precise_autolocalization() {
   // 9. Rotate robot_yaw - rotation_sum
 }
 
-void CartApproach::rotate(double rad, double speed, double angular_precision,
-                          RotationFrame frame) {
+void CartApproach::rotate(double goal_angle_rad, double speed,
+                          double angular_tolerance, RotationFrame frame) {
+  double last_angle = get_current_yaw();
+  double turn_angle = 0.0;
 
-  // TODO
-  // 1. Use rclcpp::Rate, not a timer (for encapsulation)
-  // 2.
-  // https://github.com/ivogeorg/robot_patrol/blob/main/src/go_to_pose_action.cpp
+  // If WORLD frame, subtract current robot yaw
+  double goal_angle = (frame == RotationFrame::ROBOT)
+                          ? goal_angle_rad
+                          : normalize_angle(goal_angle_rad - get_current_yaw());
+
+  geometry_msgs::msg::Twist twist;
+  twist.angular.z = (goal_angle > 0) ? speed : -speed;
+  twist.linear.x = 0.0;
+
+  // DEBUG
+  RCLCPP_DEBUG(this->get_logger(), "(rotate) Angle passed: %.2f",
+               goal_angle_rad * 180.0 / PI_);
+  switch (frame) {
+  case RotationFrame::ROBOT:
+    RCLCPP_DEBUG(this->get_logger(), "(rotate) Robot frame");
+    break;
+  case RotationFrame::WORLD:
+    RCLCPP_DEBUG(this->get_logger(), "(rotate) World frame");
+    break;
+  }
+  RCLCPP_DEBUG(this->get_logger(), "(rotate) Current yaw: %.2f",
+               get_current_yaw() * 180 / PI_);
+  RCLCPP_DEBUG(this->get_logger(), "(rotate) Goal angle: %.2f",
+               goal_angle * 180 / PI_);
+  RCLCPP_DEBUG(this->get_logger(), "(rotate) Difference from goal: %.2f",
+               (goal_angle - goal_angle_rad) * 180 / PI_);
+  // end DEBUG
+
+  // Necessary code duplication to avoid inaccuracy
+  // depending on the direction of rotation.
+  // Notice the condition in the while loops.
+  double loop_rate = 10;
+  rclcpp::Rate rate(loop_rate); // 10 Hz
+
+  if (goal_angle > 0) {
+    while (rclcpp::ok() &&
+           (abs(turn_angle + angular_tolerance) < abs(goal_angle))) {
+
+      vel_pub_->publish(twist);
+      rate.sleep();
+
+      double temp_yaw = get_current_yaw();
+      RCLCPP_DEBUG(this->get_logger(), "(rotate) Current yaw: %.2f",
+                   get_current_yaw() * 180 / PI_);
+
+      double delta_angle = normalize_angle(temp_yaw - last_angle);
+
+      turn_angle += delta_angle;
+      last_angle = temp_yaw;
+    }
+  } else {
+    while (rclcpp::ok() &&
+           (abs(turn_angle - angular_tolerance) < abs(goal_angle))) {
+
+      vel_pub_->publish(twist);
+      rate.sleep();
+
+      double temp_yaw = get_current_yaw();
+      RCLCPP_DEBUG(this->get_logger(), "(rotate) Current yaw: %.2f",
+                   get_current_yaw() * 180 / PI_);
+
+      double delta_angle = normalize_angle(temp_yaw - last_angle);
+
+      turn_angle += delta_angle;
+      last_angle = temp_yaw;
+    }
+  }
+
+  // DEBUG
+  RCLCPP_DEBUG(this->get_logger(), "(rotate) Stopping robot");
+  // end DEBUG
+
+  // stop robot
+  twist.linear.x = 0.0;
+  twist.angular.z = 0.0;
+  vel_pub_->publish(twist);
+
+  // DEBUG
+  RCLCPP_DEBUG(this->get_logger(),
+               "(rotate) Angular difference from goal: %.2f",
+               abs(goal_angle - turn_angle) * 180.0 / PI_);
+  // end DEBUG
+}
+
+/**
+ * @brief Returns the current yaw.
+ * The yaw is constantly updated in the subsctiption callbacks.
+ * There are two yaw values being kept and updated, from the
+ * topics `odom` and from `amcl_pose`, the latter only if the
+ * `nav2` stack is active.
+ */
+inline double CartApproach::get_current_yaw() {
+  // NOTE:
+  // A good place to select between last_yaw_amcl_
+  // and last_yaw_odom_ based on parameters.
+
+  //   return last_yaw_amcl_;
+  return last_yaw_odom_;
 }
 
 /**
@@ -359,7 +460,7 @@ void CartApproach::move(double dist_m, MotionDirection dir, double speed) {
 }
 
 void CartApproach::turn(double angle_rad, double speed) {
-  double last_angle = last_yaw_;
+  double last_angle = last_yaw_odom_;
   double turn_angle = 0;
   double goal_angle = angle_rad;
   geometry_msgs::msg::Twist twist;
@@ -373,14 +474,14 @@ void CartApproach::turn(double angle_rad, double speed) {
     twist.angular.z = (goal_angle > 0) ? speed : -speed;
     vel_pub_->publish(twist);
 
-    double temp_yaw = last_yaw_;
+    double temp_yaw = last_yaw_odom_;
     double delta_angle = normalize_angle(temp_yaw - last_angle);
 
     turn_angle += delta_angle;
     last_angle = temp_yaw;
   }
   // reached goal angle within tolerance, stop turning
-  //   RCLCPP_DEBUG(this->get_logger(), "Resulting yaw %f", last_yaw_);
+  //   RCLCPP_DEBUG(this->get_logger(), "Resulting yaw %f", last_yaw_odom_);
   //   RCLCPP_DEBUG(this->get_logger(), "Stopping rotation, angle = %f deg",
   //                turn_angle * RAD2DEG);
   // Stop robot
@@ -804,14 +905,21 @@ void CartApproach::test_cart_approach() {
 
   this->test_timer_->cancel();
 
-  publish_laser_origin_offset();
-  RCLCPP_DEBUG(this->get_logger(), "Calling go_to_frame");
-  bool done = go_to_frame("robot_base_footprint", "laser_origin_offset",
-                          MotionDirection::FORWARD, 0.05, 0.1, 0.08, 0.3, 0.01,
-                          0.017, tf_buffer_, vel_pub_);
+  // Test 1: go_to_frame() FORWARD to "laser_origin_offset"
+  //   publish_laser_origin_offset();
+  //   RCLCPP_DEBUG(this->get_logger(), "Calling go_to_frame");
+  //   bool done = go_to_frame("robot_base_footprint", "laser_origin_offset",
+  //                           MotionDirection::FORWARD, 0.05, 0.1, 0.08, 0.3,
+  //                           0.01, 0.017, tf_buffer_, vel_pub_);
+  //   RCLCPP_INFO(this->get_logger(), "Finished test. Success: %d",
+  //               static_cast<int>(done));
 
-  RCLCPP_INFO(this->get_logger(), "Finished test. Success: %d",
-              static_cast<int>(done));
+  // Test 2: rotate()
+  while (!have_odom_)
+    ;
+  rotate(PI_, 0.3, 0.05, RotationFrame::ROBOT);
+  rotate(-2.0 * PI_, 0.3, 0.05, RotationFrame::ROBOT);
+  rotate(PI_, 0.3, 0.05, RotationFrame::ROBOT);
 }
 
 /* ***************** M    ***************** */
