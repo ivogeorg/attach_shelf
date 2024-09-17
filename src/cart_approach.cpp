@@ -399,8 +399,8 @@ inline double CartApproach::get_current_yaw() {
   // A good place to select between last_yaw_amcl_
   // and last_yaw_odom_ based on parameters.
 
-  //   return last_yaw_amcl_;
-  return last_yaw_odom_;
+  return last_yaw_amcl_;
+  //   return last_yaw_odom_;
 }
 
 /**

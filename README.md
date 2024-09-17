@@ -779,6 +779,43 @@ This package will serve 3 services to be used for moving carts from loading to s
 1. `ros2 topic hz /topic_name`
 2. [This ROS answer](https://answers.ros.org/question/256155/the-publish-frequency-of-amcl_pose-in-navigation-amcl-package-is-too-low/) explains the low frequency of `/amcl_pose` and how to configure for faster publication.
 
+**Verified:**  
+
+```
+user:~$ ros2 topic hz /amcl_pose
+WARNING: topic [/amcl_pose] does not appear to be published yet
+average rate: 19.295
+        min: 0.000s max: 0.112s std dev: 0.05080s window: 20
+average rate: 19.115
+        min: 0.000s max: 0.112s std dev: 0.05124s window: 40
+average rate: 19.043
+        min: 0.000s max: 0.112s std dev: 0.05139s window: 60
+average rate: 19.014
+        min: 0.000s max: 0.114s std dev: 0.05146s window: 80
+average rate: 18.996
+        min: 0.000s max: 0.114s std dev: 0.05143s window: 100
+average rate: 18.859
+        min: 0.000s max: 0.120s std dev: 0.05178s window: 120
+```
+```
+user:~$ ros2 topic hz /scan
+average rate: 17.553
+        min: 0.048s max: 0.069s std dev: 0.00578s window: 19
+average rate: 17.620
+        min: 0.041s max: 0.073s std dev: 0.00774s window: 37
+average rate: 17.856
+        min: 0.041s max: 0.079s std dev: 0.00764s window: 56
+average rate: 17.928
+        min: 0.037s max: 0.079s std dev: 0.00856s window: 75
+average rate: 17.992
+        min: 0.037s max: 0.079s std dev: 0.00815s window: 94
+average rate: 17.977
+        min: 0.037s max: 0.079s std dev: 0.00791s window: 112
+average rate: 18.053
+        min: 0.037s max: 0.079s std dev: 0.00786s window: 131
+```
+
+
 ###### Problem with `odom`
 
 `odom` is all over the place, resulting in weird current yaw report. See figure below:  
