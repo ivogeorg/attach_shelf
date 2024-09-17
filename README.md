@@ -775,6 +775,10 @@ This package will serve 3 services to be used for moving carts from loading to s
 
 `rotate()` didn't work with yaw taken from `amcl_pose`. TODO: Investigate. Also, how to know the frequency publication for a topic.
 
+**Solution:**  
+1. `ros2 topic hz /topic_name`
+2. [This ROS answer](https://answers.ros.org/question/256155/the-publish-frequency-of-amcl_pose-in-navigation-amcl-package-is-too-low/) explains the low frequency of `/amcl_pose` and how to configure for faster publication.
+
 ###### Problem with `odom`
 
 `odom` is all over the place, resulting in weird current yaw report. See figure below:  
