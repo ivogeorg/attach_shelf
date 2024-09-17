@@ -764,10 +764,19 @@ This package will serve 3 services to be used for moving carts from loading to s
 
 ##### 6. Parametrize position subscription
 
-1. If not run along with `nav2`, use `odom`, otherwise use `amcl_pose`.
+1. If not run along with `nav2`, use `odom`, otherwise use `amcl_pose`. 
 2. Initialize a variable `position_sub_`, creating a subscription for the correct type, `nav_msgs::msg::Odometry` for `odom` and `geometry_msgs::msg::PoseWithCovarianceStamped` for `amcl_pose`.
 3. This will require initilization after parameter reading, that is, in the constructor body.
 4. If both exist (for which there might be a use case), there will be two separate callbacks which can assign `last_yaw_`. This will bury the logic (and the source) too deep in the code.
 5. Two different descriptive variables so the usage will be localized in `rotate` and `go_to_frame`. There, the parameter will already have been read and there can be private fields to use in conditional assignments. Note that there might be the need to assign a reference so the live value is used in the loops.
 6. Ultimately, `get_current_yaw()` is a convenient single place to localize the logic.
 
+###### Problem with `amcl_pose`
+
+`rotate()` didn't work with yaw taken from `amcl_pose`. TODO: Investigate. Also, how to know the frequency publication for a topic.
+
+###### Problem with `odom`
+
+`odom` is all over the place, resulting in weird current yaw report. See figure below:  
+
+![Weird orientation of `odom`](assets/odom_weird_orientation.png)  
