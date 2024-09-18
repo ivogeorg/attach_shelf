@@ -717,7 +717,10 @@ This package is used as a submodule in the [`warehouse_project`](https://github.
 
 ##### 1. `go_to_frame`
 
-1. ~Publisher to `/initialpose`~.
+1. ~Publisher to `/initialpose`.
+   ```
+   user:~$ ros2 topic pub --once /initialpose geometry_msgs/msg/PoseWithCovarianceStamped "{header: {stamp: {sec: 0, nanosec: 0}, frame_id: 'm'}, pose: {pose: {position: {x: 0.020047, y: -0.020043, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: -0.019467, w: 1.0}}, covariance: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}}"
+   ```
 2. ~Subscription to `/amcl_pose`~.
 3. `rotate()`.
 4. Precision autolocalization in C++.
@@ -821,3 +824,18 @@ average rate: 18.053
 `odom` is all over the place, resulting in weird current yaw report. See figure below:  
 
 ![Weird orientation of `odom`](assets/odom_weird_orientation.png)  
+
+##### 7. Publishing initial pose
+
+**Gist:**  
+
+The from-code publish:  
+1. Sometimes works fine: 
+   1. Is caught by `ros2 topic echo /initialpose`
+   2. Starts AMCL localization
+2. Sometimes works partially:
+   1. Is caught by `ros2 topic echo /initialpose`
+   2. Fails to start AMCL localization
+3. Sometimes doesn't work:
+   1. Is not caught by `ros2 topic echo /initialpose`
+   2. Fails to start AMCL localization

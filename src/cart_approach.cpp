@@ -12,6 +12,7 @@
 #include <cmath>
 #include <iostream>
 #include <tuple>
+#include <vector>
 
 #include "geometry_msgs/msg/detail/pose_with_covariance_stamped__struct.hpp"
 #include "geometry_msgs/msg/detail/transform_stamped__struct.hpp"
@@ -79,6 +80,7 @@ private:
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr elev_down_pub_;
   rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr
       initialpose_pub_;
+  rclcpp::TimerBase::SharedPtr init_pose_pub_timer_;
 
   bool have_scan_;
   bool have_odom_;
@@ -145,6 +147,14 @@ private:
    */
   enum class RotationFrame { WORLD, ROBOT };
 
+  std::vector<double> init_position_ = {0.020047, -0.020043, -0.019467,
+                                        1.000000};
+
+  const int cov_x_ix = 0;
+  const int cov_y_ix = 7;
+  const int cov_z_ix = 35;
+  const double COV_THRESHOLD = 0.025;
+
   // callbacks
   inline void
   laser_scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg);
@@ -161,10 +171,6 @@ private:
 
   // navigation
   void precise_autolocalization();
-
-  // motion
-  void move(double dist_m, MotionDirection dir, double speed); // TODO: ???
-  void turn(double angle_rad, double speed);                   // TODO: ???
 
   /**
    * @brief Rotational-only robot motion, based on `twist.angular.z` messages
@@ -222,12 +228,12 @@ CartApproach::CartApproach()
       vel_pub_{this->create_publisher<geometry_msgs::msg::Twist>(
           cmd_vel_topic_name_, 1)},
       elev_up_pub_{
-          this->create_publisher<std_msgs::msg::String>("elevator_up", 1)},
+          this->create_publisher<std_msgs::msg::String>("/elevator_up", 1)},
       elev_down_pub_{
-          this->create_publisher<std_msgs::msg::String>("elevator_down", 1)},
+          this->create_publisher<std_msgs::msg::String>("/elevator_down", 1)},
       initialpose_pub_{
           this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
-              "initialpose", 1)},
+              "/initialpose", rclcpp::QoS(1).transient_local())},
       have_scan_{false}, have_odom_{false}, have_amcl_pose_{false},
       odom_frame_{"odom"}, laser_frame_{"robot_front_laser_base_link"},
       cart_frame_{"cart_frame"}, tf_buffer_{std::make_shared<tf2_ros::Buffer>(
@@ -271,23 +277,25 @@ CartApproach::odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
  * superior to `odom`. Runs within the `nav2` stack.
  */
 inline void CartApproach::amcl_pose_callback(
-    const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg) {
-  last_amcl_pose_ = *msg;
+    const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr amcl_pose) {
+  RCLCPP_DEBUG(this->get_logger(),
+               "amcl_pose.pose.covariance: x: %f, y: %f, z: %f",
+               amcl_pose->pose.covariance[cov_x_ix],
+               amcl_pose->pose.covariance[cov_y_ix],
+               amcl_pose->pose.covariance[cov_z_ix]);
+  last_amcl_pose_ = *amcl_pose;
   last_yaw_amcl_ = yaw_from_quaternion(
-      msg->pose.pose.orientation.x, msg->pose.pose.orientation.y,
-      msg->pose.pose.orientation.z, msg->pose.pose.orientation.w);
+      amcl_pose->pose.pose.orientation.x, amcl_pose->pose.pose.orientation.y,
+      amcl_pose->pose.pose.orientation.z, amcl_pose->pose.pose.orientation.w);
   have_amcl_pose_ = true;
 }
 
 /**
- * @brief Callback for
- * @param msg
+ * @brief Used for robot to autonomously and accurately localize itself.
  */
 void CartApproach::precise_autolocalization() {
 
   // TODO
-  // 1. Need subscription to /amcl_pose
-  // 2. Need a publisher to /initialpose
   // 3. Publish "init_position" to /initialpose
   // 4. Get and record current robot_yaw (/amcl_pose)
   // 5. Initialize rotation_sum
@@ -296,6 +304,53 @@ void CartApproach::precise_autolocalization() {
   //    7. Rotate 360 deg and add to rotation_sum
   //    8. Rotate -180 deg and add to rotation_sum
   // 9. Rotate robot_yaw - rotation_sum
+
+  geometry_msgs::msg::PoseWithCovarianceStamped initialpose;
+  initialpose.header.stamp = this->get_clock()->now();
+  initialpose.header.frame_id = "map";
+  initialpose.pose.pose.position.x = init_position_[0];
+  initialpose.pose.pose.position.y = init_position_[1];
+  initialpose.pose.pose.orientation.z = init_position_[2];
+  initialpose.pose.pose.orientation.w = init_position_[3];
+
+  RCLCPP_DEBUG(this->get_logger(), "Publishing initial pose");
+  initialpose_pub_->publish(initialpose);
+
+  std::chrono::seconds sleep_seconds = 10s;
+  RCLCPP_DEBUG(this->get_logger(), "Sleeping for %ld seconds",
+               sleep_seconds.count());
+  rclcpp::sleep_for(sleep_seconds);
+
+  if (!have_amcl_pose_) {
+    RCLCPP_ERROR(this->get_logger(), "Failed to autolocalize");
+    return;
+  }
+
+  //   double orig_yaw = get_current_yaw();
+
+  double loc_speed = 1.0;
+
+  while (last_amcl_pose_.pose.covariance[cov_x_ix] > COV_THRESHOLD ||
+         last_amcl_pose_.pose.covariance[cov_y_ix] > COV_THRESHOLD ||
+         last_amcl_pose_.pose.covariance[cov_z_ix] > COV_THRESHOLD) {
+
+    //   while (!(last_amcl_pose_.pose.covariance[cov_x_ix] < COV_THRESHOLD &&
+    //            last_amcl_pose_.pose.covariance[cov_y_ix] < COV_THRESHOLD &&
+    //            last_amcl_pose_.pose.covariance[cov_z_ix] < COV_THRESHOLD)) {
+    RCLCPP_DEBUG(this->get_logger(), "Rotating for precise localization");
+    rotate(PI_, loc_speed, 0.05, RotationFrame::ROBOT);
+    rotate(-2.0 * PI_, loc_speed, 0.05, RotationFrame::ROBOT);
+    rotate(PI_, loc_speed, 0.05, RotationFrame::ROBOT);
+  }
+  RCLCPP_DEBUG(
+      this->get_logger(),
+      "Robot localized at pos_x: %f, pos_y: %f, ori_z: %f, ori_w: %f Cov "
+      "[x=%f, y=%f, z=%f]",
+      initialpose.pose.pose.position.x, initialpose.pose.pose.position.y,
+      initialpose.pose.pose.orientation.z, initialpose.pose.pose.orientation.w,
+      last_amcl_pose_.pose.covariance[cov_x_ix],
+      last_amcl_pose_.pose.covariance[cov_y_ix],
+      last_amcl_pose_.pose.covariance[cov_z_ix]);
 }
 
 void CartApproach::rotate(double goal_angle_rad, double speed,
@@ -424,106 +479,6 @@ inline double CartApproach::normalize_angle(double angle) {
 inline double CartApproach::yaw_from_quaternion(double x, double y, double z,
                                                 double w) {
   return atan2(2.0f * (w * z + x * y), w * w + x * x - y * y - z * z);
-}
-
-/**
- * @brief Simple linear motion
- * A blocking call, not a fall-through, so don't use in
- * callbacks. Because it relaculates the distance at
- * each loop, the tolerance can be smaller.
- */
-void CartApproach::move(double dist_m, MotionDirection dir, double speed) {
-
-  // Use straight /odom)
-  geometry_msgs::msg::Twist twist;
-  twist.linear.x = (dir == MotionDirection::FORWARD) ? speed : -speed;
-  twist.angular.z = 0.0;
-  double dist = 0.0, x_init, y_init, x, y;
-  x_init = last_odom_.pose.pose.position.x;
-  y_init = last_odom_.pose.pose.position.y;
-  RCLCPP_DEBUG(this->get_logger(), "Linear motion goal %f m", dist_m);
-  while (abs(dist + LINEAR_TOLERANCE * 0.25) < dist_m) {
-    vel_pub_->publish(twist);
-    // rclcpp::sleep_for(100ms);
-
-    x = last_odom_.pose.pose.position.x;
-    y = last_odom_.pose.pose.position.y;
-    dist += sqrt(pow(x - x_init, 2.0) + pow(y - y_init, 2.0));
-    x_init = x;
-    y_init = y;
-  }
-  // Stop robot
-  twist.linear.x = 0.0;
-  twist.angular.z = 0.0;
-  vel_pub_->publish(twist);
-  RCLCPP_DEBUG(this->get_logger(), "Done moving, dist = %f m. Stopping", dist);
-}
-
-void CartApproach::turn(double angle_rad, double speed) {
-  double last_angle = last_yaw_odom_;
-  double turn_angle = 0;
-  double goal_angle = angle_rad;
-  geometry_msgs::msg::Twist twist;
-
-  RCLCPP_DEBUG(this->get_logger(), "Turning goal %f rad", goal_angle);
-  while ((goal_angle > 0 &&
-          (abs(turn_angle + ANGULAR_TOLERANCE) < abs(goal_angle))) ||
-         (goal_angle < 0 && (abs(turn_angle - ANGULAR_TOLERANCE) <
-                             abs(goal_angle)))) { // need to turn (more)
-    twist.linear.x = 0.0;
-    twist.angular.z = (goal_angle > 0) ? speed : -speed;
-    vel_pub_->publish(twist);
-
-    double temp_yaw = last_yaw_odom_;
-    double delta_angle = normalize_angle(temp_yaw - last_angle);
-
-    turn_angle += delta_angle;
-    last_angle = temp_yaw;
-  }
-  // reached goal angle within tolerance, stop turning
-  //   RCLCPP_DEBUG(this->get_logger(), "Resulting yaw %f", last_yaw_odom_);
-  //   RCLCPP_DEBUG(this->get_logger(), "Stopping rotation, angle = %f deg",
-  //                turn_angle * RAD2DEG);
-  // Stop robot
-  twist.linear.x = 0.0;
-  twist.angular.z = 0.0;
-  vel_pub_->publish(twist);
-  RCLCPP_DEBUG(this->get_logger(),
-               "Done turning, turn angle = %f rad. Stopping", turn_angle);
-}
-
-/**
- * @brief Segments a sorted linear collection of numbers
- * @param v a vector of integers to segment
- * @param threshold the minimum distance between segments
- * @return A vector of vectors each holding a segment
- */
-std::vector<std::vector<int>> CartApproach::segment(std::vector<int> &v,
-                                                    const int threshold) {
-  std::vector<std::vector<int>> vector_set;
-
-  std::sort(v.begin(), v.end());
-
-  int last = 0;
-  std::vector<int> vec;
-  for (auto &p : v) {
-    if (p - last != p) { // not the first point
-      if (p - last < threshold) {
-        vec.push_back(p);
-      } else {
-        vector_set.push_back(vec);
-        // vec is copied, so can continue using it
-        vec.clear();
-        vec.push_back(p);
-      }
-    } else {
-      vec.push_back(p); // first point, so just insert
-    }
-    last = p;
-  }
-  vector_set.push_back(vec);
-
-  return vector_set;
 }
 
 /**
@@ -903,7 +858,9 @@ void CartApproach::test_cart_approach() {
   // Broadcast "laser_origin_offset"
   // Move to that frame to tune the parameters of go_to_frame
 
+  RCLCPP_DEBUG(this->get_logger(), "test_cart_approach");
   this->test_timer_->cancel();
+  RCLCPP_DEBUG(this->get_logger(), "Cancelled timer");
 
   // Test 1: go_to_frame() FORWARD to "laser_origin_offset"
   //   publish_laser_origin_offset();
@@ -915,11 +872,16 @@ void CartApproach::test_cart_approach() {
   //               static_cast<int>(done));
 
   // Test 2: rotate()
-  while (!have_odom_)
-    ;
-  rotate(PI_, 0.3, 0.05, RotationFrame::ROBOT);
-  rotate(-2.0 * PI_, 0.3, 0.05, RotationFrame::ROBOT);
-  rotate(PI_, 0.3, 0.05, RotationFrame::ROBOT);
+  //   while (!have_amcl_pose_)
+  //     ;
+  //   rotate(PI_, 0.3, 0.05, RotationFrame::ROBOT);
+  //   rotate(-2.0 * PI_, 0.3, 0.05, RotationFrame::ROBOT);
+  //   rotate(PI_, 0.3, 0.05, RotationFrame::ROBOT);
+
+  // Test 3: amcl_pose_callback()
+
+  // Test 4: precise_autolocalization()
+    precise_autolocalization();
 }
 
 /* ***************** M    ***************** */
