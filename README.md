@@ -839,3 +839,33 @@ The from-code publish:
 3. Sometimes doesn't work:
    1. Is not caught by `ros2 topic echo /initialpose`
    2. Fails to start AMCL localization
+
+**Avoiding the problem:**  
+1. Change `set_initial_pose: true` and set `initial_pose` parameter values (`x`, `y`, `z`, `yaw`) with `"init_position"`.
+2. Use this [3D Rotation Converter](https://www.andre-gaschler.com/rotationconverter/) to get the yaw from the orientation quaternion of the pose. 
+
+##### 8. Subscribing to amcl pose
+
+**Gist:**
+
+The problem is illustrated by this log snippet:
+```
+user:~/ros2_ws$ ros2 launch attach_shelf cart_approach_test.launch.py
+[INFO] [launch]: All log files can be found below /home/user/.ros/log/2024-09-19-02-52-58-926816-1_xterm-15685
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [cart_approach_test_node-1]: process started with pid [15694]
+[cart_approach_test_node-1] [INFO] [1726714379.041771216] [cart_approach_test_node]: Cart approach testingsandbox started
+[cart_approach_test_node-1] [INFO] [1726714379.041939760] [cart_approach_test_node]: Successfully set logger level 'DEBUG' for cart_approach_test_node.
+[cart_approach_test_node-1] [DEBUG] [1726714379.141895659] [cart_approach_test_node]: test_cart_approach
+[cart_approach_test_node-1] [DEBUG] [1726714379.142042067] [cart_approach_test_node]: Cancelled timer
+[cart_approach_test_node-1] [DEBUG] [1726714379.142065324] [cart_approach_test_node]: Robot autolocalized at pos_x: 0.000000, pos_y: 0.000000, ori_z: 0.000000, ori_w: 1.000000 Cov [x=0.000000, y=0.000000, z=0.000000]
+[cart_approach_test_node-1] [DEBUG] [1726714380.487671962] [cart_approach_test_node]: amcl_pose:: pos_x: 0.000000, pos_y: 0.000000, ori_z: 0.000000, ori_w: 1.000000 Cov [x=0.000000, y=0.000000, z=0.000000]
+[cart_approach_test_node-1] [DEBUG] [1726714380.565140191] [cart_approach_test_node]: amcl_pose:: pos_x: 0.028726, pos_y: -0.020338, ori_z: -0.014508, ori_w: 0.999895 Cov [x=0.000000, y=0.000000, z=0.000000]
+[cart_approach_test_node-1] [DEBUG] [1726714380.713129984] [cart_approach_test_node]: amcl_pose:: pos_x: 0.028727, pos_y: -0.020338, ori_z: -0.014508, ori_w: 0.999895 Cov [x=0.000000, y=0.000000, z=0.000000]
+[cart_approach_test_node-1] [DEBUG] [1726714380.793686755] [cart_approach_test_node]: amcl_pose:: pos_x: 0.028728, pos_y: -0.020338, ori_z: -0.014507, ori_w: 0.999895 Cov [x=0.000000, y=0.000000, z=0.000000]
+[cart_approach_test_node-1] [DEBUG] [1726714380.869737076] [cart_approach_test_node]: amcl_pose:: pos_x: 0.028729, pos_y: -0.020338, ori_z: -0.014506, ori_w: 0.999895 Cov [x=0.000000, y=0.000000, z=0.000000]
+```  
+
+**Observations:**  
+1. The `amcl_pose_callback` is called too late.
+2. The first callback carries an all-zeros AMCL pose.
