@@ -232,9 +232,12 @@ CartApproach::CartApproach()
           this->create_publisher<std_msgs::msg::String>("/elevator_up", 1)},
       elev_down_pub_{
           this->create_publisher<std_msgs::msg::String>("/elevator_down", 1)},
+      //   initialpose_pub_{
+      //       this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
+      //           "/initialpose", rclcpp::QoS(1).transient_local())},
       initialpose_pub_{
           this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
-              "/initialpose", rclcpp::QoS(1).transient_local())},
+              "/initialpose", 10)},
       have_scan_{false}, have_odom_{false}, have_amcl_pose_{false},
       odom_frame_{"odom"}, laser_frame_{"robot_front_laser_base_link"},
       cart_frame_{"cart_frame"}, tf_buffer_{std::make_shared<tf2_ros::Buffer>(
@@ -279,21 +282,20 @@ CartApproach::odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
  */
 inline void CartApproach::amcl_pose_callback(
     const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr amcl_pose) {
-//   RCLCPP_DEBUG(this->get_logger(),
-//                "amcl_pose.pose.covariance: x: %f, y: %f, z: %f",
-//                amcl_pose->pose.covariance[cov_x_ix],
-//                amcl_pose->pose.covariance[cov_y_ix],
-//                amcl_pose->pose.covariance[cov_z_ix]);
-  RCLCPP_DEBUG(
-      this->get_logger(),
-      "amcl_pose:: pos_x: %f, pos_y: %f, ori_z: %f, ori_w: %f Cov "
-      "[x=%f, y=%f, z=%f]",
-      last_amcl_pose_.pose.pose.position.x, last_amcl_pose_.pose.pose.position.y,
-      last_amcl_pose_.pose.pose.orientation.z, last_amcl_pose_.pose.pose.orientation.w,
-      last_amcl_pose_.pose.covariance[cov_x_ix],
-      last_amcl_pose_.pose.covariance[cov_y_ix],
-      last_amcl_pose_.pose.covariance[cov_z_ix]);
-      
+  //   RCLCPP_DEBUG(
+  //       this->get_logger(),
+  //       "amcl_pose:: frame_id: %s, pos_x: %f, pos_y: %f, ori_z: %f, ori_w: %f
+  //       Cov "
+  //       "[x=%f, y=%f, z=%f]",
+  //       last_amcl_pose_.header.frame_id.c_str(),
+  //       last_amcl_pose_.pose.pose.position.x,
+  //       last_amcl_pose_.pose.pose.position.y,
+  //       last_amcl_pose_.pose.pose.orientation.z,
+  //       last_amcl_pose_.pose.pose.orientation.w,
+  //       last_amcl_pose_.pose.covariance[cov_x_ix],
+  //       last_amcl_pose_.pose.covariance[cov_y_ix],
+  //       last_amcl_pose_.pose.covariance[cov_z_ix]);
+
   last_amcl_pose_ = *amcl_pose;
   last_yaw_amcl_ = yaw_from_quaternion(
       amcl_pose->pose.pose.orientation.x, amcl_pose->pose.pose.orientation.y,
@@ -305,39 +307,22 @@ inline void CartApproach::amcl_pose_callback(
  * @brief Used for robot to autonomously and accurately localize itself.
  */
 void CartApproach::precise_autolocalization() {
+  geometry_msgs::msg::PoseWithCovarianceStamped initialpose;
+  initialpose.header.stamp = this->get_clock()->now();
+  initialpose.header.frame_id = "map";
+  initialpose.pose.pose.position.x = init_position_[0];
+  initialpose.pose.pose.position.y = init_position_[1];
+  initialpose.pose.pose.orientation.z = init_position_[2];
+  initialpose.pose.pose.orientation.w = init_position_[3];
 
-  // TODO
-  // 3. Publish "init_position" to /initialpose
-  // 4. Get and record current robot_yaw (/amcl_pose)
-  // 5. Initialize rotation_sum
-  // 5. Until {x, y, z} covariances below 0.025
-  //    6. Rotate -180 deg and add to rotation_sum
-  //    7. Rotate 360 deg and add to rotation_sum
-  //    8. Rotate -180 deg and add to rotation_sum
-  // 9. Rotate robot_yaw - rotation_sum
+  rclcpp::Rate pub_rate(10);
+  geometry_msgs::msg::PoseWithCovarianceStamped pose;
 
-//   geometry_msgs::msg::PoseWithCovarianceStamped initialpose;
-//   initialpose.header.stamp = this->get_clock()->now();
-//   initialpose.header.frame_id = "map";
-//   initialpose.pose.pose.position.x = init_position_[0];
-//   initialpose.pose.pose.position.y = init_position_[1];
-//   initialpose.pose.pose.orientation.z = init_position_[2];
-//   initialpose.pose.pose.orientation.w = init_position_[3];
-
-//   RCLCPP_DEBUG(this->get_logger(), "Publishing initial pose");
-//   initialpose_pub_->publish(initialpose);
-
-//   std::chrono::seconds sleep_seconds = 10s;
-//   RCLCPP_DEBUG(this->get_logger(), "Sleeping for %ld seconds",
-//                sleep_seconds.count());
-//   rclcpp::sleep_for(sleep_seconds);
-
-//   if (!have_amcl_pose_) {
-//     RCLCPP_ERROR(this->get_logger(), "Failed to autolocalize");
-//     return;
-//   }
-
-  //   double orig_yaw = get_current_yaw();
+  RCLCPP_DEBUG(this->get_logger(), "Publishing initial pose and waiting for valid /amcl_pose msg");
+  while (last_amcl_pose_ == pose) {
+    initialpose_pub_->publish(initialpose);
+    pub_rate.sleep();
+  }
 
   double loc_speed = 1.0;
 
@@ -349,12 +334,15 @@ void CartApproach::precise_autolocalization() {
     rotate(-2.0 * PI_, loc_speed, 0.05, RotationFrame::ROBOT);
     rotate(PI_, loc_speed, 0.05, RotationFrame::ROBOT);
   }
-  RCLCPP_DEBUG(
+
+  RCLCPP_INFO(
       this->get_logger(),
       "Robot autolocalized at pos_x: %f, pos_y: %f, ori_z: %f, ori_w: %f Cov "
       "[x=%f, y=%f, z=%f]",
-      last_amcl_pose_.pose.pose.position.x, last_amcl_pose_.pose.pose.position.y,
-      last_amcl_pose_.pose.pose.orientation.z, last_amcl_pose_.pose.pose.orientation.w,
+      last_amcl_pose_.pose.pose.position.x,
+      last_amcl_pose_.pose.pose.position.y,
+      last_amcl_pose_.pose.pose.orientation.z,
+      last_amcl_pose_.pose.pose.orientation.w,
       last_amcl_pose_.pose.covariance[cov_x_ix],
       last_amcl_pose_.pose.covariance[cov_y_ix],
       last_amcl_pose_.pose.covariance[cov_z_ix]);
@@ -888,7 +876,7 @@ void CartApproach::test_cart_approach() {
   // Test 3: amcl_pose_callback()
 
   // Test 4: precise_autolocalization()
-    precise_autolocalization();
+  precise_autolocalization();
 }
 
 /* ***************** M    ***************** */
