@@ -717,14 +717,7 @@ This package is used as a submodule in the [`warehouse_project`](https://github.
 
 ##### 1. `go_to_frame`
 
-1. ~Publisher to `/initialpose`.
-   ```
-   user:~$ ros2 topic pub --once /initialpose geometry_msgs/msg/PoseWithCovarianceStamped "{header: {stamp: {sec: 0, nanosec: 0}, frame_id: 'm'}, pose: {pose: {position: {x: 0.020047, y: -0.020043, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: -0.019467, w: 1.0}}, covariance: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}}"
-   ```
-2. ~Subscription to `/amcl_pose`~.
-3. `rotate()`.
-4. Precision autolocalization in C++.
-5. `go_to_frame()`:
+1. `go_to_frame()`:
    1. Subtract `robot_yaw` from `error_yaw_dir`.
    2. Introduce states `enum class PoseStages { STEER_DIR, GO_STRAIGHT, ALIGN_YAW, STOP };`
       1. `STEER_DIR`: Use `error_yaw_dir` to turn the robot toward the target position (`angular.z` only).
@@ -869,3 +862,26 @@ user:~/ros2_ws$ ros2 launch attach_shelf cart_approach_test.launch.py
 **Observations:**  
 1. The `amcl_pose_callback` is called too late.
 2. The first callback carries an all-zeros AMCL pose.
+
+**Solution:**
+1. Start before `amcl`.
+2. Publish to `/intitialpose` in a loop.
+3. Terminate at a valid `/amcl_pose` msg.
+```
+  geometry_msgs::msg::PoseWithCovarianceStamped initialpose;
+  initialpose.header.stamp = this->get_clock()->now();
+  initialpose.header.frame_id = "map";
+  initialpose.pose.pose.position.x = init_position_[0];
+  initialpose.pose.pose.position.y = init_position_[1];
+  initialpose.pose.pose.orientation.z = init_position_[2];
+  initialpose.pose.pose.orientation.w = init_position_[3];
+
+  rclcpp::Rate pub_rate(10);
+  geometry_msgs::msg::PoseWithCovarianceStamped pose;
+
+  RCLCPP_DEBUG(this->get_logger(), "Publishing initial pose and waiting for valid /amcl_pose msg");
+  while (last_amcl_pose_ == pose) {
+    initialpose_pub_->publish(initialpose);
+    pub_rate.sleep();
+  }
+```  

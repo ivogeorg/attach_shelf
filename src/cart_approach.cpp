@@ -132,6 +132,13 @@ private:
   enum class MotionDirection { FORWARD, BACKWARD };
 
   /**
+   * @class GoToFrameStages
+   * @brief An enum type for the stages of motion toward a frame.
+   * @see method go_to_frame() uses in motion loop
+   */
+  enum class GoToFrameStages { STEER_DIR, GO_STRAIGHT, ALIGN_YAW, STOP };
+
+  /**
    * @brief Linear distance the robot should correct for.
    * Before the robot rotates to orient itself toward the
    * origin of `cart_frame`, it should move forward the
@@ -171,6 +178,7 @@ private:
   solve_sas_triangle(double left_side, double right_side, double sas_angle);
 
   // navigation
+  void publish_initial_pose();
   void precise_autolocalization();
 
   /**
@@ -304,9 +312,10 @@ inline void CartApproach::amcl_pose_callback(
 }
 
 /**
- * @brief Used for robot to autonomously and accurately localize itself.
+ * @brief Used to send a pose to nav2 topic /initialpose
+ * Needs to be started before AMCL for robustness
  */
-void CartApproach::precise_autolocalization() {
+void CartApproach::publish_initial_pose() {
   geometry_msgs::msg::PoseWithCovarianceStamped initialpose;
   initialpose.header.stamp = this->get_clock()->now();
   initialpose.header.frame_id = "map";
@@ -318,11 +327,19 @@ void CartApproach::precise_autolocalization() {
   rclcpp::Rate pub_rate(10);
   geometry_msgs::msg::PoseWithCovarianceStamped pose;
 
-  RCLCPP_DEBUG(this->get_logger(), "Publishing initial pose and waiting for valid /amcl_pose msg");
+  RCLCPP_DEBUG(this->get_logger(),
+               "Publishing initial pose and waiting for valid /amcl_pose msg");
   while (last_amcl_pose_ == pose) {
     initialpose_pub_->publish(initialpose);
     pub_rate.sleep();
   }
+}
+
+/**
+ * @brief Used for robot to autonomously and accurately localize itself.
+ */
+void CartApproach::precise_autolocalization() {
+  RCLCPP_DEBUG(this->get_logger(), "Localizing robot...");
 
   double loc_speed = 1.0;
 
@@ -704,12 +721,13 @@ bool CartApproach::go_to_frame(
     rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr vel_pub) {
   RCLCPP_DEBUG(this->get_logger(), "Entering go_to_frame");
 
+  // motion loop, looking up TF to target and adjusting motion
+  rclcpp::Rate loop_rate(10); // 10 Hz
   bool done = false;
   geometry_msgs::msg::TransformStamped tf_msg;
 
-  rclcpp::Rate loop_rate(10); // 10 Hz
-
   while (rclcpp::ok()) {
+    // get transform from origin to target frame
     try {
       tf_msg = tf_buff->lookupTransform(origin_frame_id, target_frame_id,
                                         tf2::TimePointZero);
@@ -719,7 +737,10 @@ bool CartApproach::go_to_frame(
                    origin_frame_id.c_str(), target_frame_id.c_str(), ex.what());
       break;
     }
-    // move the robot toward target frame
+
+    // define errors based on transform
+
+    // linear distance to target
     double error_distance = std::hypotf(tf_msg.transform.translation.x,
                                         tf_msg.transform.translation.y);
 
@@ -738,15 +759,15 @@ bool CartApproach::go_to_frame(
     //              "(go_to_frame) TF Listener: error_distance = %f m",
     //              error_distance);
 
+    // heading toward target
+    double error_yaw_dir = normalize_angle(
+        atan2(tf_msg.transform.translation.y, tf_msg.transform.translation.x) -
+        get_current_yaw());
+
+    // yaw alignment with target
     double error_yaw_align = yaw_from_quaternion(
         tf_msg.transform.rotation.x, tf_msg.transform.rotation.y,
         tf_msg.transform.rotation.z, tf_msg.transform.rotation.w);
-
-    double error_yaw_dir =
-        atan2(tf_msg.transform.translation.y, tf_msg.transform.translation.x);
-    // TODO: subtract robot yaw in world frame (odom or amcl_pose)
-    // TODO: for amcl_pose, need to autolocalize accurately first (rotations in
-    // place)
 
     // RCLCPP_DEBUG(this->get_logger(),
     //              "(go_to_frame) TF Listener: error_yaw_align = %f rad",
@@ -857,26 +878,17 @@ void CartApproach::test_cart_approach() {
   this->test_timer_->cancel();
   RCLCPP_DEBUG(this->get_logger(), "Cancelled timer");
 
-  // Test 1: go_to_frame() FORWARD to "laser_origin_offset"
-  //   publish_laser_origin_offset();
-  //   RCLCPP_DEBUG(this->get_logger(), "Calling go_to_frame");
-  //   bool done = go_to_frame("robot_base_footprint", "laser_origin_offset",
-  //                           MotionDirection::FORWARD, 0.05, 0.1, 0.08, 0.3,
-  //                           0.01, 0.017, tf_buffer_, vel_pub_);
-  //   RCLCPP_INFO(this->get_logger(), "Finished test. Success: %d",
-  //               static_cast<int>(done));
-
-  // Test 2: rotate()
-  //   while (!have_amcl_pose_)
-  //     ;
-  //   rotate(PI_, 0.3, 0.05, RotationFrame::ROBOT);
-  //   rotate(-2.0 * PI_, 0.3, 0.05, RotationFrame::ROBOT);
-  //   rotate(PI_, 0.3, 0.05, RotationFrame::ROBOT);
-
-  // Test 3: amcl_pose_callback()
-
-  // Test 4: precise_autolocalization()
+  publish_initial_pose();
   precise_autolocalization();
+
+  // Test 1: go_to_frame() FORWARD to "laser_origin_offset"
+  publish_laser_origin_offset();
+  RCLCPP_DEBUG(this->get_logger(), "Calling go_to_frame");
+  bool done = go_to_frame("robot_base_footprint", "laser_origin_offset",
+                          MotionDirection::FORWARD, 0.05, 0.1, 0.08, 0.3, 0.01,
+                          0.017, tf_buffer_, vel_pub_);
+  RCLCPP_INFO(this->get_logger(), "Finished test. Success: %d",
+              static_cast<int>(done));
 }
 
 /* ***************** M    ***************** */
