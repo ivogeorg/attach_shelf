@@ -207,9 +207,23 @@ private:
   inline double yaw_from_quaternion(double x, double y, double z, double w);
 
   // testing
+  const std::string tf_name_load_pos_{"tf_load_pos"};
+  const std::string tf_name_face_ship_pos_{"tf_face_ship_pos"};
+  const std::string root_frame_{"map"};
+
+  const std::map<std::string, std::tuple<double, double, double, double>>
+      poses = {{"loading_position", {5.653875, -0.186439, -0.746498, 0.665388}},
+               {"face_shipping_position",
+                {2.552175, -0.092728, 0.715685, 0.698423}}};
+
+  geometry_msgs::msg::TransformStamped tf_stamped_load_pos_;
+  geometry_msgs::msg::TransformStamped tf_stamped_face_ship_pos_;
+
   rclcpp::TimerBase::SharedPtr test_timer_;
+
   void test_cart_approach();
   void publish_laser_origin_offset();
+  void send_transforms_from_poses();
 };
 
 /**
@@ -713,6 +727,24 @@ void CartApproach::publish_laser_origin_offset() {
   rclcpp::sleep_for(3s);
 }
 
+void CartApproach::send_transforms_from_poses() {
+  geometry_msgs::msg::PoseStamped load_pos = make_pose(
+      this->get_clock()->now(), root_frame_, poses.at("loading_position"));
+
+  static_tf_broadcaster_->sendTransform(
+      tf_stamped_from_pose_stamped(load_pos, tf_name_load_pos_));
+
+  geometry_msgs::msg::PoseStamped face_ship_pos =
+      make_pose(this->get_clock()->now(), root_frame_,
+                poses.at("face_shipping_position"));
+
+  static_tf_broadcaster_->sendTransform(
+      tf_stamped_from_pose_stamped(face_ship_pos, tf_name_face_ship_pos_));
+
+  // wait for 3 seconds (2s were enough) for the TFs to register
+  rclcpp::sleep_for(3s);
+}
+
 bool CartApproach::go_to_frame(
     std::string origin_frame_id, std::string target_frame_id,
     MotionDirection dir, double min_lin_speed, double max_lin_speed,
@@ -725,6 +757,8 @@ bool CartApproach::go_to_frame(
   rclcpp::Rate loop_rate(10); // 10 Hz
   bool done = false;
   geometry_msgs::msg::TransformStamped tf_msg;
+  GoToFrameStages stage = GoToFrameStages::STEER_DIR;
+  geometry_msgs::msg::Twist vel_msg;
 
   while (rclcpp::ok()) {
     // get transform from origin to target frame
@@ -765,63 +799,83 @@ bool CartApproach::go_to_frame(
         get_current_yaw());
 
     // yaw alignment with target
-    double error_yaw_align = yaw_from_quaternion(
+    double error_yaw_align = normalize_angle(yaw_from_quaternion(
         tf_msg.transform.rotation.x, tf_msg.transform.rotation.y,
-        tf_msg.transform.rotation.z, tf_msg.transform.rotation.w);
+        tf_msg.transform.rotation.z, tf_msg.transform.rotation.w));
 
     // RCLCPP_DEBUG(this->get_logger(),
     //              "(go_to_frame) TF Listener: error_yaw_align = %f rad",
     //              error_yaw_align);
 
-    geometry_msgs::msg::Twist vel_msg;
-
     static const double kp_yaw = 1.0;
     static const double kp_distance = 1.0;
     double base_speed;
 
-    // TODO:
-    // TODO:
-    // TODO:
-    //
-    // While there is still linear distance, angular.z should point
-    // toward the origin of the target frame. When the linear is
-    // within tolerance, angular.z should align with the target frame.
+    // motion loop
+    switch (stage) {
+    case GoToFrameStages::STEER_DIR:
+      if (abs(error_yaw_dir) > ang_tolerance) { // correct heading first
+        vel_msg.linear.x = 0.0;
+        base_speed = kp_yaw * error_yaw_dir;
+        base_speed = clip_speed(base_speed, min_ang_speed, max_ang_speed);
+        vel_msg.angular.z = base_speed;
+      } else {
+        vel_msg.angular.z = 0.0;
+        stage = GoToFrameStages::GO_STRAIGHT;
+      }
+      break;
+    case GoToFrameStages::GO_STRAIGHT:
+      // Send back to STEER_DIR if heading is off
+      // NOTE: This can be problematic, especially near the linear goal!
+      //   if (abs(error_yaw_dir) > ang_tolerance) { // correct heading first
+      //     stage = GoToFrameStages::STEER_DIR;
+      //   } else
+      if (abs(error_distance) > lin_tolerance) { // then go straight
+        base_speed = kp_distance * error_distance;
+        base_speed = clip_speed(base_speed, min_lin_speed, max_lin_speed);
+        vel_msg.linear.x = base_speed;
 
-    // Note:
-    // To use the error_yaw_dir first to keep heading toward the goal position
-    // it is best to have both linear.x and angular.z non-zero, otherwise they
-    // will need to be applied angular.z first and then linear.x. This is
-    // problematic because this motion is done in a loop and will require a
-    // mess of boolean variables or a full state machine.
-
-    // State machine at a rate of 10 Hz might do the job nicely and won't
-    // require iterative tuning, which is impractical with the slow turnaround
-    // of the dev platform.
-
-    // States:
-    // STEER_DIR (angular.z): point toward the target position
-    // LINEAR (linear.x): move forward or backward as directed
-    // ALIGN_YAW (angular.z): match the rotation of the target frame
-    if (abs(error_yaw_align) > ang_tolerance) { // correct angular first
-      vel_msg.linear.x = 0.0;
-      base_speed = kp_yaw * (-error_yaw_align);
-      base_speed = clip_speed(base_speed, min_ang_speed, max_ang_speed);
-      vel_msg.angular.z = base_speed;
-    } else if (abs(error_distance) > lin_tolerance) {
-      base_speed = kp_distance * error_distance;
-      base_speed = clip_speed(base_speed, min_lin_speed, max_lin_speed);
-      vel_msg.linear.x = base_speed;
-      vel_msg.angular.z = 0.0;
-    } else {
+        // adjust heading if big error and far enough from target
+        if (abs(error_distance) > (2.0 * lin_tolerance) &&
+            abs(error_yaw_dir) > ang_tolerance) {
+          base_speed = (kp_yaw / 2.0) * error_yaw_dir;
+          vel_msg.angular.z = base_speed;
+        } else {
+          vel_msg.angular.z = 0.0;
+        }
+      } else {
+        vel_msg.linear.x = 0.0;
+        vel_msg.angular.z = 0.0;
+        stage = GoToFrameStages::ALIGN_YAW;
+      }
+      break;
+    case GoToFrameStages::ALIGN_YAW:
+      if (abs(error_yaw_align) > ang_tolerance) { // then align
+        vel_msg.linear.x = 0.0;
+        base_speed = kp_yaw * error_yaw_align;
+        base_speed = clip_speed(base_speed, min_ang_speed, max_ang_speed);
+        vel_msg.angular.z = base_speed;
+      } else {
+        vel_msg.angular.z = 0.0;
+        stage = GoToFrameStages::STOP;
+      }
+      break;
+    case GoToFrameStages::STOP:
       vel_msg.linear.x = 0.0;
       vel_msg.angular.z = 0.0;
       done = true;
+      break;
+    default:
+      RCLCPP_ERROR(this->get_logger(), "(go_to_frame) Unknown motion stage");
+      return false;
     }
 
-    RCLCPP_DEBUG(this->get_logger(), "dist: %f, align: %f, dir: %f, x=%f, z=%f",
-                 error_distance, error_yaw_align, error_yaw_dir,
-                 vel_msg.linear.x, vel_msg.angular.z);
+    RCLCPP_DEBUG(this->get_logger(),
+                 "stage %d: dir: %f, dist: %f, align: %f, x=%f, z=%f",
+                 static_cast<int>(stage), error_yaw_dir, error_distance,
+                 error_yaw_align, vel_msg.linear.x, vel_msg.angular.z);
 
+    // publish geometry_msgs::msg::Twist to topic /cmd_vel
     if (!done)
       vel_pub->publish(vel_msg);
     else
@@ -847,18 +901,16 @@ bool CartApproach::go_to_frame(
  * the sign of the speed to be clipped.
  */
 double CartApproach::clip_speed(double value, double min, double max) {
-  bool positive = value > 0.0;
   min = abs(min);
   max = abs(max);
+  double angle = abs(value);
 
-  if (positive) {
-    value = (value > max) ? max : value;
-    value = (value < min) ? min : value;
-  } else { // negative
-    value = (value < -max) ? max : value;
-    value = (value > -min) ? min : value;
-  }
-  return value;
+  if (angle > max)
+    angle = max;
+  if (angle < min)
+    angle = min;
+
+  return (value > 0) ? angle : -angle;
 }
 
 /*
@@ -882,11 +934,22 @@ void CartApproach::test_cart_approach() {
   precise_autolocalization();
 
   // Test 1: go_to_frame() FORWARD to "laser_origin_offset"
-  publish_laser_origin_offset();
+  //   publish_laser_origin_offset();
+  //   RCLCPP_DEBUG(this->get_logger(), "Calling go_to_frame");
+  //   bool done = go_to_frame("robot_base_footprint", "laser_origin_offset",
+  //                           MotionDirection::FORWARD, 0.05, 0.1, 0.08, 0.3,
+  //                           0.01, 0.017, tf_buffer_, vel_pub_);
+  //   RCLCPP_INFO(this->get_logger(), "Finished test. Success: %d",
+  //               static_cast<int>(done));
+
+  // Test 2: go_to_frame() FORWARD to "laser_origin_offset"
+  RCLCPP_INFO(this->get_logger(), "Publishing pose frames");
+  send_transforms_from_poses();
   RCLCPP_DEBUG(this->get_logger(), "Calling go_to_frame");
-  bool done = go_to_frame("robot_base_footprint", "laser_origin_offset",
-                          MotionDirection::FORWARD, 0.05, 0.1, 0.08, 0.3, 0.01,
-                          0.017, tf_buffer_, vel_pub_);
+  bool done =
+      go_to_frame("robot_base_footprint", "tf_load_pos",
+                  MotionDirection::FORWARD, 0.01, 0.3, 0.25, 0.4, 0.01, 0.017,
+                  tf_buffer_, vel_pub_);
   RCLCPP_INFO(this->get_logger(), "Finished test. Success: %d",
               static_cast<int>(done));
 }
