@@ -885,3 +885,18 @@ user:~/ros2_ws$ ros2 launch attach_shelf cart_approach_test.launch.py
     pub_rate.sleep();
   }
 ```  
+
+##### 9. Going from pose to pose
+
+**Gist:**
+
+There is a vastly inaccurate heading computed to `"tf_ship_pos"` when robot is approximately at `"tf_face_ship_pos"`. See log, gazebo, and Rviz2 below:  
+
+| Log + Gazebo | Rviz2 |
+| --- | --- |
+| ![Wrong heading log + Gazebo](assets/wrong_heading_log_and_gazebo.png) | ![Wrong heading Rviz2](assets/wrong_heading_rviz2.png) | 
+
+**Notes & questions:** 
+1. The `dir` angle (the heading) should be almost zero as `"tf_face_ship_pos"` and `"tf_ship_pos"` are almost completely aligned, that is, the former "points at" the latter.
+   ![Wrong heading for aligned frames](assets/wrong_heading_for_aligned_frames_rviz2.png)  
+2. Should `"tf_face_ship_pos"` be used instead of `"robot_base_footprint"` as the origin frame? Can the accuracy of positioning be relied on?  
