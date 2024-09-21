@@ -2,7 +2,7 @@
  * @file approach_service_server.cpp
  * @brief Implements a final approach service for the RB1 robot.
  * @author Ivo Georgiev
- * @version 0.9
+ * @version 0.3
  */
 
 #include "attach_shelf/tf_utils.hpp"
@@ -754,6 +754,8 @@ void CartApproach::send_transforms_from_poses() {
   rclcpp::sleep_for(3s);
 }
 
+// TODO: Paremetrize
+// - Condition for adding angular correction when moving linearly
 bool CartApproach::go_to_frame(
     std::string origin_frame_id, std::string target_frame_id,
     MotionDirection dir, double min_lin_speed, double max_lin_speed,
@@ -788,9 +790,8 @@ bool CartApproach::go_to_frame(
                                         tf_msg.transform.translation.y);
 
     // heading toward target
-    double error_yaw_dir = normalize_angle(
-        atan2(tf_msg.transform.translation.y, tf_msg.transform.translation.x) -
-        get_current_yaw());
+    double error_yaw_dir =
+        atan2(tf_msg.transform.translation.y, tf_msg.transform.translation.x);
 
     // TODO:
     // TODO:
@@ -874,9 +875,10 @@ bool CartApproach::go_to_frame(
     }
 
     RCLCPP_DEBUG(this->get_logger(),
-                 "stage %d: dir: %f, dist: %f, align: %f, x=%f, z=%f",
-                 static_cast<int>(stage), error_yaw_dir, error_distance,
-                 error_yaw_align, vel_msg.linear.x, vel_msg.angular.z);
+                 "stage %d: dir: %f (yaw=%f), dist: %f, align: %f, x=%f, z=%f",
+                 static_cast<int>(stage), error_yaw_dir, get_current_yaw(),
+                 error_distance, error_yaw_align, vel_msg.linear.x,
+                 vel_msg.angular.z);
 
     // publish geometry_msgs::msg::Twist to topic /cmd_vel
     if (!done)
@@ -974,7 +976,7 @@ void CartApproach::test_cart_approach() {
   //                       BACKWARD to "tf_face_ship_pos",
   RCLCPP_DEBUG(this->get_logger(), "Calling go_to_frame");
   bool done = go_to_frame("robot_base_footprint", "tf_face_ship_pos",
-                          MotionDirection::FORWARD, 0.01, 0.3, 0.25, 0.4, 0.01,
+                          MotionDirection::FORWARD, 0.01, 0.3, 0.25, 0.4, 0.05,
                           0.05, tf_buffer_, vel_pub_);
   RCLCPP_INFO(this->get_logger(), "Finished go_to_frame. Success: %d",
               static_cast<int>(done));
@@ -983,8 +985,8 @@ void CartApproach::test_cart_approach() {
 
   RCLCPP_DEBUG(this->get_logger(), "Calling go_to_frame");
   done = go_to_frame("robot_base_footprint", "tf_ship_pos",
-                     MotionDirection::FORWARD, 0.01, 0.3, 0.25, 0.4, 0.01,
-                     0.05, tf_buffer_, vel_pub_);
+                     MotionDirection::FORWARD, 0.01, 0.3, 0.25, 0.4, 0.05, 0.05,
+                     tf_buffer_, vel_pub_);
   RCLCPP_INFO(this->get_logger(), "Finished go_to_frame. Success: %d",
               static_cast<int>(done));
 
@@ -992,7 +994,7 @@ void CartApproach::test_cart_approach() {
 
   RCLCPP_DEBUG(this->get_logger(), "Calling go_to_frame");
   done = go_to_frame("robot_base_footprint", "tf_face_ship_pos",
-                     MotionDirection::BACKWARD, 0.01, 0.3, 0.25, 0.4, 0.01,
+                     MotionDirection::BACKWARD, 0.01, 0.3, 0.25, 0.4, 0.05,
                      0.05, tf_buffer_, vel_pub_);
   RCLCPP_INFO(this->get_logger(), "Finished test. Success: %d",
               static_cast<int>(done));

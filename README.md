@@ -890,7 +890,7 @@ user:~/ros2_ws$ ros2 launch attach_shelf cart_approach_test.launch.py
 
 **Gist:**
 
-There is a vastly inaccurate heading computed to `"tf_ship_pos"` when robot is approximately at `"tf_face_ship_pos"`. See log, gazebo, and Rviz2 below:  
+There is a vastly inaccurate heading computed to `"tf_ship_pos"` when robot is approximately at `"tf_face_ship_pos"`. See log, Gazebo, and Rviz2 below:  
 
 | Log + Gazebo | Rviz2 |
 | --- | --- |
@@ -900,3 +900,16 @@ There is a vastly inaccurate heading computed to `"tf_ship_pos"` when robot is a
 1. The `dir` angle (the heading) should be almost zero as `"tf_face_ship_pos"` and `"tf_ship_pos"` are almost completely aligned, that is, the former "points at" the latter.
    ![Wrong heading for aligned frames](assets/wrong_heading_for_aligned_frames_rviz2.png)  
 2. Should `"tf_face_ship_pos"` be used instead of `"robot_base_footprint"` as the origin frame? Can the accuracy of positioning be relied on?  
+
+**Solution:**  
+Do not subtract the robot's yaw from the result of `atan2(y, x)`. The latter is already in the robot's frame if the parent/origin frame is `robot_base_footprint`.
+
+##### 10. Oscillation on backing up
+
+**Gist:***  
+
+When commanded to back up from current position to a TF (situated generally behind the robot) the robot oscillates trying to achieve heading error below angular tolerance.  
+
+| Log + Gazebo | Rviz2 |
+| --- | --- |
+| ![Oscillation at backing up (log)](assets/backing_up_heading_oscillation_log.png) | ![Oscillation at backing up (Rviz2)](assets/backing_up_heading_oscillation_rviz2.png) |
