@@ -906,7 +906,7 @@ Do not subtract the robot's yaw from the result of `atan2(y, x)`. The latter is 
 
 ##### 10. Oscillation on backing up
 
-**Gist:***  
+**Gist:**  
 
 When commanded to back up from current position to a TF (situated generally behind the robot) the robot oscillates trying to achieve heading error below angular tolerance.  
 
