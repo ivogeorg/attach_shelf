@@ -1,5 +1,5 @@
-### `attach_shelf`
 
+### `attach_shelf`
 Table of Contents
 =================
 
@@ -913,3 +913,10 @@ When commanded to back up from current position to a TF (situated generally behi
 | Log + Gazebo | Rviz2 |
 | --- | --- |
 | ![Oscillation at backing up (log)](assets/backing_up_heading_oscillation_log.png) | ![Oscillation at backing up (Rviz2)](assets/backing_up_heading_oscillation_rviz2.png) |
+
+**Notes:**  
+1. Robot steering is unintuitive because it is the _opposite_ of what a car would do with a steering wheel. For example, if the steering wheel is rotated to the right, the car will turn right if going forward and also right if it's going backward. It would do circles in the same circular trajectory whether going forward or backward. The robot, if a negative angle is applied to the motion, it will turn to the right if it's going forward but it will turn left if it is going backward.
+   | | x > 0 | x < 0 |
+   | --- | --- | --- |
+   | **z < 0** | forward, right | backward, left |
+   | **z > 0** | forward, left | backward right |
