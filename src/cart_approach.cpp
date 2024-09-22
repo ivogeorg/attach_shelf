@@ -803,7 +803,11 @@ bool CartApproach::go_to_frame(
     // and `face_shipping_position`
     if (dir == MotionDirection::BACKWARD) {
       error_distance *= -1.0;
-      error_yaw_dir *= -1.0;
+
+      // TODO: is more subtle
+      // 1. sign
+      // 2. magnitude (hint: around +/-180)
+      error_yaw_dir = (PI_ - abs(error_yaw_dir)) * -1.0;
     }
 
     // yaw alignment with target
