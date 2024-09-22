@@ -870,8 +870,8 @@ bool CartApproach::go_to_frame(
     }
 
     RCLCPP_DEBUG(this->get_logger(),
-                 "stage %d: dir: %f (yaw=%f), dist: %f, align: %f, x=%f, z=%f",
-                 static_cast<int>(stage), error_yaw_dir, get_current_yaw(),
+                 "stage %d: dir: %f, dist: %f, align: %f, x=%f, z=%f",
+                 static_cast<int>(stage), error_yaw_dir,
                  error_distance, error_yaw_align, vel_msg.linear.x,
                  vel_msg.angular.z);
 
@@ -903,14 +903,14 @@ bool CartApproach::go_to_frame(
 double CartApproach::clip_speed(double value, double min, double max) {
   min = abs(min);
   max = abs(max);
-  double angle = abs(value);
+  double speed = abs(value);
 
-  if (angle > max)
-    angle = max;
-  if (angle < min)
-    angle = min;
+  if (speed > max)
+    speed = max;
+  if (speed < min)
+    speed = min;
 
-  return (value > 0) ? angle : -angle;
+  return (value > 0) ? speed : -speed;
 }
 
 /*
@@ -989,7 +989,7 @@ void CartApproach::test_cart_approach() {
 
   RCLCPP_DEBUG(this->get_logger(), "Calling go_to_frame");
   done = go_to_frame("robot_base_footprint", "tf_face_ship_pos",
-                     MotionDirection::BACKWARD, 0.01, 0.3, 0.25, 0.4, 0.05,
+                     MotionDirection::BACKWARD, 0.01, 0.15, 0.25, 0.4, 0.05,
                      0.05, tf_buffer_, vel_pub_);
   RCLCPP_INFO(this->get_logger(), "Finished test. Success: %d",
               static_cast<int>(done));

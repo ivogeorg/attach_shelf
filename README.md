@@ -920,3 +920,28 @@ When commanded to back up from current position to a TF (situated generally behi
    | --- | --- | --- |
    | **z < 0** | <img src="assets/fwd_right_arrow.png" width="100"/> | <img src="assets/bwd_left_arrow.png" width="100"/> |
    | **z > 0** | <img src="assets/fwd_left_arrow.png" width="100"/> | <img src="assets/bwd_right_arrow.png" width="100"/> |
+
+
+##### 11. Rviz2 and Gazebo out of synch
+
+**Gist:**  
+
+With `nav2` stack running, while robot is backing up (and `twist.linear.x` is negative), the robot moves backward in Gazebo but is shown to move forward in Rviz2.
+
+| Log + Gazebo | Rviz2 |
+| --- | --- |
+| ![Gazebo and Rviz2 out of synch (log, Gazebo)](assets/gazebo_rviz2_out_of_synch_log_gazebo.png) | ![Gazebo and Rviz2 out of synch (Rviz2)](assets/gazebo_rviz2_out_of_synch_rviz2.png) | 
+
+**Notes & questions:**  
+1. This is most probably due to the nav2 stack. Here are the messages from `global_costmap`:
+   ```
+   [planner_server-5] [WARN] [1727041231.835360793] [global_costmap.global_costmap]: Sensor origin at (2.31, 2.80) is out of map bounds (-1.14, -4.30) to (6.64, 2.28). The costmap cannot raytrace for it.
+   [planner_server-5] [WARN] [1727041232.834538499] [nav2_costmap_2d]: Robot is out of bounds of the costmap!
+   [planner_server-5] [WARN] [1727041232.834584937] [global_costmap.global_costmap]: Sensor origin at (2.31, 2.80) is out of map bounds (-1.14, -4.30) to (6.64, 2.28). The costmap cannot raytrace for it.
+   [planner_server-5] [WARN] [1727041233.834538888] [nav2_costmap_2d]: Robot is out of bounds of the costmap!
+   [planner_server-5] [WARN] [1727041233.834587566] [global_costmap.global_costmap]: Sensor origin at (2.31, 2.80) is out of map bounds (-1.14, -4.30) to (6.64, 2.28). The costmap cannot raytrace for it.
+   [planner_server-5] [WARN] [1727041234.834712621] [nav2_costmap_2d]: Robot is out of bounds of the costmap!
+   [planner_server-5] [WARN] [1727041234.834831756] [global_costmap.global_costmap]: Sensor origin at (2.31, 2.80) is out of map bounds (-1.14, -4.30) to (6.64, 2.28). The costmap cannot raytrace for it.
+   [planner_server-5] [WARN] [1727041231.835316157] [nav2_costmap_2d]: Robot is out of bounds of the costmap!
+   ```   
+2. The log shows that the (negative) distance grows as if the robot is moving (forward and) farther away from the target frame.
