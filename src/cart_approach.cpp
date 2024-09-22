@@ -793,21 +793,12 @@ bool CartApproach::go_to_frame(
     double error_yaw_dir =
         atan2(tf_msg.transform.translation.y, tf_msg.transform.translation.x);
 
-    // TODO:
-    // TODO:
-    // TODO:
-    //
-    // When moving backward, what should be the sign of the angle?
-    // Backing up with the joystick feels counterintuitive, so
-    // should test and study with backing up to `loading_poscition`
-    // and `face_shipping_position`
     if (dir == MotionDirection::BACKWARD) {
       error_distance *= -1.0;
 
-      // TODO: is more subtle
-      // 1. sign
-      // 2. magnitude (hint: around +/-180)
-      error_yaw_dir = (PI_ - abs(error_yaw_dir)) * -1.0;
+      // Subtract abs from 180 so ang_tolerance still works
+      // Flip sign
+      error_yaw_dir = (PI_ - abs(error_yaw_dir)) * ((error_yaw_dir > 0) ? -1.0 : 1.0);
     }
 
     // yaw alignment with target
