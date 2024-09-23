@@ -717,17 +717,15 @@ This package is used as a submodule in the [`warehouse_project`](https://github.
 
 ##### 1. `go_to_frame`
 
-1. `go_to_frame()`:
-   1. Subtract `robot_yaw` from `error_yaw_dir`.
-   2. Introduce states `enum class PoseStages { STEER_DIR, GO_STRAIGHT, ALIGN_YAW, STOP };`
-      1. `STEER_DIR`: Use `error_yaw_dir` to turn the robot toward the target position (`angular.z` only).
-      2. `GO_STRAIGHT`: Use `error_distance` to go forward or backward depending on argument (`linear.x` only).
-      3. `ALIGN_YAW`: Use `error_yaw_align` to align the robot with the target frame (`angular.z` only).
-      4. `STOP`: All errors within tolerance. Stop the robot and exit.
-6. Test from current pose to `"laser_origin_offset"` (`MotionDirection::FORWARD`).
-7. Test from initial position to `"tf_face_ship_pos"` (`MotionDirection::FORWARD`).
-8. Test from shipping position to `"tf_face_ship_pos"` (`MotionDirection::BACKWARD`).
-9. Test everything in lab.
+Works fine forward and backward in the simulator once the AMCL parameters `update_min_a` and `update_min_d` were set to positive values.
+
+| go_to_frame |
+| --- |
+| ![1](assets/go_to_frame_1.png) |
+| ![2](assets/go_to_frame_2.png) |
+| ![3](assets/go_to_frame_3.png) |
+| ![4](assets/go_to_frame_4.png) |
+| ![5](assets/go_to_frame_5.png) |
 
 ##### 2. Face cart straight in
 
@@ -747,16 +745,16 @@ This package will serve 3 services to be used for moving carts from loading to s
 
 ###### Services  
 
-1. `"cart_pick_up"`
-2. `"cart_set_down"`
-3. `"back_up"` (with or without cart)
+1. `"cart_pick_up"`: approach, go under, pick up (`go_to_frame()`), back to `"tf_load_pos"`
+2. `"cart_set_down"`: (go to `"tf_ship_pos"`), set down, back up (`move()`), back to `"tf_face_ship_pos"`
 
 ###### Package name candidates
 
 1. `warehouse_services`
 2. `warehouse_cart`
 3. `cart_servicing`
-4. `warehouse_cart_servicing` *
+4. `warehouse_cart_servicing`
+4. `warehouse_cart_services` *
 
 ##### 6. Parametrize position subscription
 
@@ -863,7 +861,7 @@ user:~/ros2_ws$ ros2 launch attach_shelf cart_approach_test.launch.py
 1. The `amcl_pose_callback` is called too late.
 2. The first callback carries an all-zeros AMCL pose.
 
-**Solution:**
+**Solution (simulator):**
 1. Start before `amcl`.
 2. Publish to `/intitialpose` in a loop.
 3. Terminate at a valid `/amcl_pose` msg.
@@ -950,5 +948,11 @@ With `nav2` stack running, while robot is backing up (and `twist.linear.x` is ne
 | Log + Gazebo | Rviz2 |
 | --- | --- |
 | ![Laser scan correct (log, Gazebo)](assets/backing_laser_scan_correct_log_and_gazebo.png) | ![Laser scan correct (Rviz2)](assets/backing_laser_scan_correct_rviz2.png) |
+
+**Solution:**  
+The hack of non-positive `update_min_a` and `update_min_d` parameters for AMCL does not seem to be true to physics and causes weird behaviors with localization. In the lab, the message  **"Negative eigenvalue found for position. Is the covariance matrix correct (positive semidefinite)?"**, along with the inability to set the initial pose through Rviz2, code, or command line showed unequivocally that this is not a realistic setting. In the simulator, it was the cause of the "forward" movement of the robot when it was actually simulated to move backward.  
+
+![Negative eigenvalue in posigion](assets/negative_eigenvalue_for_position_lab.png)  
+
 
 
