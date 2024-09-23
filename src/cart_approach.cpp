@@ -207,6 +207,7 @@ private:
   inline double yaw_from_quaternion(double x, double y, double z, double w);
 
   // testing
+  const std::string tf_name_init_pos_{"tf_init_pos"};
   const std::string tf_name_load_pos_{"tf_load_pos"};
   const std::string tf_name_face_ship_pos_{"tf_face_ship_pos"};
   const std::string tf_name_ship_pos_{"tf_ship_pos"};
@@ -214,6 +215,7 @@ private:
 
   const std::map<std::string, std::tuple<double, double, double, double>>
       poses = {
+          {"init_position", {0.020047, -0.020043, -0.019467, 1.000000}},
           {"loading_position", {5.653875, -0.186439, -0.746498, 0.665388}},
           {"face_shipping_position", {2.552175, -0.092728, 0.715685, 0.698423}},
           {"shipping_position", {2.577595, 0.901998, 0.698087, 0.716013}}};
@@ -731,6 +733,12 @@ void CartApproach::publish_laser_origin_offset() {
 }
 
 void CartApproach::send_transforms_from_poses() {
+  geometry_msgs::msg::PoseStamped init_pos = make_pose(
+      this->get_clock()->now(), root_frame_, poses.at("init_position"));
+
+  static_tf_broadcaster_->sendTransform(
+      tf_stamped_from_pose_stamped(init_pos, tf_name_init_pos_));
+
   geometry_msgs::msg::PoseStamped load_pos = make_pose(
       this->get_clock()->now(), root_frame_, poses.at("loading_position"));
 
@@ -798,7 +806,8 @@ bool CartApproach::go_to_frame(
 
       // Subtract abs from 180 so ang_tolerance still works
       // Flip sign
-      error_yaw_dir = (PI_ - abs(error_yaw_dir)) * ((error_yaw_dir > 0) ? -1.0 : 1.0);
+      error_yaw_dir =
+          (PI_ - abs(error_yaw_dir)) * ((error_yaw_dir > 0) ? -1.0 : 1.0);
     }
 
     // yaw alignment with target
@@ -871,9 +880,8 @@ bool CartApproach::go_to_frame(
 
     RCLCPP_DEBUG(this->get_logger(),
                  "stage %d: dir: %f, dist: %f, align: %f, x=%f, z=%f",
-                 static_cast<int>(stage), error_yaw_dir,
-                 error_distance, error_yaw_align, vel_msg.linear.x,
-                 vel_msg.angular.z);
+                 static_cast<int>(stage), error_yaw_dir, error_distance,
+                 error_yaw_align, vel_msg.linear.x, vel_msg.angular.z);
 
     // publish geometry_msgs::msg::Twist to topic /cmd_vel
     if (!done)
@@ -969,6 +977,33 @@ void CartApproach::test_cart_approach() {
   // Test 4: go_to_frame() FORWARD  to "tf_face_ship_pos",
   //                       FORWARD  to "tf_ship_pos",
   //                       BACKWARD to "tf_face_ship_pos",
+//   RCLCPP_DEBUG(this->get_logger(), "Calling go_to_frame");
+//   bool done = go_to_frame("robot_base_footprint", "tf_face_ship_pos",
+//                           MotionDirection::FORWARD, 0.01, 0.3, 0.25, 0.4, 0.05,
+//                           0.05, tf_buffer_, vel_pub_);
+//   RCLCPP_INFO(this->get_logger(), "Finished go_to_frame. Success: %d",
+//               static_cast<int>(done));
+
+//   rclcpp::sleep_for(3s);
+
+//   RCLCPP_DEBUG(this->get_logger(), "Calling go_to_frame");
+//   done = go_to_frame("robot_base_footprint", "tf_ship_pos",
+//                      MotionDirection::FORWARD, 0.01, 0.3, 0.25, 0.4, 0.05, 0.05,
+//                      tf_buffer_, vel_pub_);
+//   RCLCPP_INFO(this->get_logger(), "Finished go_to_frame. Success: %d",
+//               static_cast<int>(done));
+
+//   rclcpp::sleep_for(3s);
+
+//   RCLCPP_DEBUG(this->get_logger(), "Calling go_to_frame");
+//   done = go_to_frame("robot_base_footprint", "tf_face_ship_pos",
+//                      MotionDirection::BACKWARD, 0.01, 0.15, 0.25, 0.4, 0.05,
+//                      0.05, tf_buffer_, vel_pub_);
+//   RCLCPP_INFO(this->get_logger(), "Finished test. Success: %d",
+//               static_cast<int>(done));
+
+  // Test 5: go_to_frame() FORWARD  to "tf_face_ship_pos",
+  //                       BACKWARD to "tf_init_pos"
   RCLCPP_DEBUG(this->get_logger(), "Calling go_to_frame");
   bool done = go_to_frame("robot_base_footprint", "tf_face_ship_pos",
                           MotionDirection::FORWARD, 0.01, 0.3, 0.25, 0.4, 0.05,
@@ -979,16 +1014,7 @@ void CartApproach::test_cart_approach() {
   rclcpp::sleep_for(3s);
 
   RCLCPP_DEBUG(this->get_logger(), "Calling go_to_frame");
-  done = go_to_frame("robot_base_footprint", "tf_ship_pos",
-                     MotionDirection::FORWARD, 0.01, 0.3, 0.25, 0.4, 0.05, 0.05,
-                     tf_buffer_, vel_pub_);
-  RCLCPP_INFO(this->get_logger(), "Finished go_to_frame. Success: %d",
-              static_cast<int>(done));
-
-  rclcpp::sleep_for(3s);
-
-  RCLCPP_DEBUG(this->get_logger(), "Calling go_to_frame");
-  done = go_to_frame("robot_base_footprint", "tf_face_ship_pos",
+  done = go_to_frame("robot_base_footprint", "tf_init_pos",
                      MotionDirection::BACKWARD, 0.01, 0.15, 0.25, 0.4, 0.05,
                      0.05, tf_buffer_, vel_pub_);
   RCLCPP_INFO(this->get_logger(), "Finished test. Success: %d",

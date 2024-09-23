@@ -945,3 +945,10 @@ With `nav2` stack running, while robot is backing up (and `twist.linear.x` is ne
    [planner_server-5] [WARN] [1727041231.835316157] [nav2_costmap_2d]: Robot is out of bounds of the costmap!
    ```   
 2. The log shows that the (negative) distance grows as if the robot is moving (forward and) farther away from the target frame.
+3. The laser scan contour remains faithful to the robot, that is, it stays correct to the robot as if it were moving backward. See below, in a simplified FORWARD then BACKWARD test:
+
+| Log + Gazebo | Rviz2 |
+| --- | --- |
+| ![Laser scan correct (log, Gazebo)](assets/backing_laser_scan_correct_log_and_gazebo.png) | ![Laser scan correct (Rviz2)](assets/backing_laser_scan_correct_rviz2.png) |
+
+
