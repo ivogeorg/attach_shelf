@@ -201,6 +201,10 @@ private:
               double ang_tolerance, std::shared_ptr<tf2_ros::Buffer> tf_buff,
               rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr vel_pub);
 
+  // services
+  bool cart_pick_up_cb();
+  bool cart_set_down_cb();
+
   // misc utilities
   double clip_speed(double value, double min, double max);
   inline double normalize_angle(double angle);
@@ -793,7 +797,8 @@ void CartApproach::send_transforms_from_poses() {
 }
 
 // TODO: Paremetrize !!!
-// - Conditions for adding angular correction when moving linearly
+// - Conditions for adding angular correction when moving linearly, incl. not to
+// correct (for slow motions, e.g. under cart)
 // - Loop rate
 // - Tolerances
 // - Speeds
@@ -952,6 +957,49 @@ double CartApproach::clip_speed(double value, double min, double max) {
     speed = min;
 
   return (value > 0) ? speed : -speed;
+}
+
+bool CartApproach::face_cart() {
+  /*
+      TODO
+      ====
+      Loop to face straight in
+      Send TF "tf_cart_front_midpoint" and "tf_cart_centerpoint"
+  */
+
+  /*
+      Loop until edge ranges are equal
+      Correct for laser origin offset
+      Turn until edge range indices equidistant from front index (541)
+      Send TFs
+  */
+  double left_edge_range = 0.0, right_edge_range = 1.1;
+  int left_edge_ix, right_edge_ix;
+  const double EDGE_RANGE_DIFF_TOLERANCE = 0.02;
+  const double MIN_PLATE_RANGE = 0.85;
+  while (abs(left_edge_range - right_edge_range) > EDGE_RANGE_DIFF_TOLERANCE) {
+    // identify plates, segment, find inner edge indices and ranges
+    // if any range is under a threshold, back up, turning toward longer (calculate using indices)
+    // whichever range is larger
+    //   rotate robot to half-profile to cart (calculate using indices)
+    //   move slowly until ranges within tolerance
+    // send static TF to "tf_laser_origin"
+    // move to "tf_laser_origin" (go_to_frame())
+    // rotate until edge indices equidistant from front index (541)
+  }
+}
+
+bool CartApproach::cart_pick_up_cb() {
+  /*
+      TODO
+      ====
+      Send TF "tf_load_pos" where stopped after BN.goToPose()
+      Face cart
+      Approach "tf_cart_front_midpoint" (go_to_frame())
+      Approach "tf_cart_centerpoint" (go_to_frame())
+      Pick up cart
+      Back to "tf_load_pos" (go_to_frame())
+  */
 }
 
 /*
