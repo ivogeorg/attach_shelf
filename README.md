@@ -740,6 +740,9 @@ Works fine forward and backward in the simulator once the AMCL parameters `updat
 
 Face the cart, broadcast `"cart_frame_front_midpoint"` and `"cart_frame_centerpoint"`.
 
+This may take a few tries, where the robot backs up to start a new try. Here's an approximate strategy:  
+ ![Backing up for another attempt](assets/face_cart_back_up_algorithm.png)    
+
 ##### 3. Pick up the cart
 
 Without service, use the fixed frames in (2) to move in underneath the cart and pick it up.

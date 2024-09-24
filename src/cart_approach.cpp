@@ -154,10 +154,18 @@ private:
    */
   enum class RotationFrame { WORLD, ROBOT };
 
-  std::vector<double> init_position_ = {0.020047, -0.020043, -0.019467,
-                                        1.000000};
+  // SIMULATOR
+    std::vector<double> init_position_ = {0.020047, -0.020043, -0.019467,
+                                          1.000000};
   // yaw = -0.0389291
 
+  // LAB
+//   std::vector<double> init_position_ = {0.054368, 0.060027, -0.000433,
+//                                         1.000000};
+  // yaw = -0.0073978
+  /*
+          {"init_position", {0.054368, 0.060027, -0.000433, 1.0000}},
+  */
   const int cov_x_ix = 0;
   const int cov_y_ix = 7;
   const int cov_z_ix = 35;
@@ -205,6 +213,9 @@ private:
   bool cart_pick_up_cb();
   bool cart_set_down_cb();
 
+  // service utilities
+  bool face_cart();
+
   // misc utilities
   double clip_speed(double value, double min, double max);
   inline double normalize_angle(double angle);
@@ -220,18 +231,19 @@ private:
   // TODO: Parametrize!!!
   const std::map<std::string, std::tuple<double, double, double, double>>
       // SIMULATOR:
-      poses = {
-          {"init_position", {0.020047, -0.020043, -0.019467, 1.000000}},
-          {"loading_position", {5.653875, -0.186439, -0.746498, 0.665388}},
-          {"face_shipping_position", {2.552175, -0.092728, 0.715685, 0.698423}},
-          {"shipping_position", {2.577595, 0.901998, 0.698087, 0.716013}}};
+        poses = {
+            {"init_position", {0.020047, -0.020043, -0.019467, 1.000000}},
+            {"loading_position", {5.653875, -0.186439, -0.746498, 0.665388}},
+            {"face_shipping_position", {2.552175, -0.092728, 0.715685,
+            0.698423}},
+            {"shipping_position", {2.577595, 0.901998, 0.698087, 0.716013}}};
 
-  // LAB:
-  //   poses = {
-  //       {"init_position", {0.054368, 0.060027, -0.000433, 1.0000}},
-  //       {"loading_position", {4.472548, -0.187311, -0.694903, 0.719103}},
-  //       {"face_shipping_position", {1.879749, 0.141987, 0.656541, 0.754290}},
-  //       {"shipping_position", {1.878660, 1.114233, 0.706215, 0.707997}}};
+      // LAB:
+    //   poses = {
+    //       {"init_position", {0.054368, 0.060027, -0.000433, 1.0000}},
+    //       {"loading_position", {4.472548, -0.187311, -0.694903, 0.719103}},
+    //       {"face_shipping_position", {1.879749, 0.141987, 0.656541, 0.754290}},
+    //       {"shipping_position", {1.878660, 1.114233, 0.706215, 0.707997}}};
 
   geometry_msgs::msg::TransformStamped tf_stamped_load_pos_;
   geometry_msgs::msg::TransformStamped tf_stamped_face_ship_pos_;
@@ -265,7 +277,13 @@ CartApproach::CartApproach()
           "amcl_pose", 10,
           std::bind(&CartApproach::amcl_pose_callback, this, _1),
           topic_pub_sub_options_)},
-      cmd_vel_topic_name_{"/diffbot_base_controller/cmd_vel_unstamped"},
+
+      // TODO: Parametrize!!!
+      // SIMULATOR
+        cmd_vel_topic_name_{"/diffbot_base_controller/cmd_vel_unstamped"},
+      // LAB
+    //   cmd_vel_topic_name_{"cmd_vel"},
+
       vel_pub_{this->create_publisher<geometry_msgs::msg::Twist>(
           cmd_vel_topic_name_, 1)},
       elev_up_pub_{
@@ -385,7 +403,16 @@ void CartApproach::precise_autolocalization() {
 
   double loc_speed = 1.0;
 
-  while (last_amcl_pose_.pose.covariance[cov_x_ix] > COV_THRESHOLD ||
+  // if message is empty or any of the covariances is high
+  while ((last_amcl_pose_.header.frame_id == "" &&
+          last_amcl_pose_.pose.pose.position.x == 0.0 &&
+          last_amcl_pose_.pose.pose.position.y == 0.0 &&
+          last_amcl_pose_.pose.pose.orientation.z == 0.0 &&
+          last_amcl_pose_.pose.pose.orientation.w == 1.0 &&
+          last_amcl_pose_.pose.covariance[cov_x_ix] == 0.0 &&
+          last_amcl_pose_.pose.covariance[cov_y_ix] == 0.0 &&
+          last_amcl_pose_.pose.covariance[cov_z_ix] == 0.0) ||
+         last_amcl_pose_.pose.covariance[cov_x_ix] > COV_THRESHOLD ||
          last_amcl_pose_.pose.covariance[cov_y_ix] > COV_THRESHOLD ||
          last_amcl_pose_.pose.covariance[cov_z_ix] > COV_THRESHOLD) {
     RCLCPP_DEBUG(this->get_logger(), "Rotating for precise localization");
@@ -393,17 +420,6 @@ void CartApproach::precise_autolocalization() {
     rotate(-2.0 * PI_, loc_speed, 0.05, RotationFrame::ROBOT);
     rotate(PI_, loc_speed, 0.05, RotationFrame::ROBOT);
   }
-  //   do {
-  //     RCLCPP_DEBUG(this->get_logger(), "Rotating for precise localization");
-  //     rotate(PI_, loc_speed, 0.05, RotationFrame::ROBOT);
-  //     rotate(-2.0 * PI_, loc_speed, 0.05, RotationFrame::ROBOT);
-  //     rotate(PI_, loc_speed, 0.05, RotationFrame::ROBOT);
-  //   } while ((last_amcl_pose_.pose.covariance[cov_x_ix] != 0.0 &&
-  //             last_amcl_pose_.pose.covariance[cov_x_ix] > COV_THRESHOLD) ||
-  //            (last_amcl_pose_.pose.covariance[cov_y_ix] != 0.0 &&
-  //             last_amcl_pose_.pose.covariance[cov_y_ix] > COV_THRESHOLD) ||
-  //            (last_amcl_pose_.pose.covariance[cov_z_ix] != 0.0 &&
-  //             last_amcl_pose_.pose.covariance[cov_z_ix] > COV_THRESHOLD));
 
   RCLCPP_INFO(
       this->get_logger(),
@@ -973,20 +989,30 @@ bool CartApproach::face_cart() {
       Turn until edge range indices equidistant from front index (541)
       Send TFs
   */
-  double left_edge_range = 0.0, right_edge_range = 1.1;
-  int left_edge_ix, right_edge_ix;
-  const double EDGE_RANGE_DIFF_TOLERANCE = 0.02;
-  const double MIN_PLATE_RANGE = 0.85;
-  while (abs(left_edge_range - right_edge_range) > EDGE_RANGE_DIFF_TOLERANCE) {
-    // identify plates, segment, find inner edge indices and ranges
-    // if any range is under a threshold, back up, turning toward longer (calculate using indices)
-    // whichever range is larger
-    //   rotate robot to half-profile to cart (calculate using indices)
-    //   move slowly until ranges within tolerance
-    // send static TF to "tf_laser_origin"
-    // move to "tf_laser_origin" (go_to_frame())
-    // rotate until edge indices equidistant from front index (541)
-  }
+  //   double left_edge_range = 0.0, right_edge_range = 1.1;
+  //   int left_edge_ix, right_edge_ix;
+  //   const double EDGE_RANGE_DIFF_TOLERANCE = 0.02;
+  //   const double MIN_PLATE_RANGE = 0.65;
+  //   while (abs(left_edge_range - right_edge_range) >
+  //   EDGE_RANGE_DIFF_TOLERANCE) {
+  //     // identify plates, segment, find inner edge indices and ranges
+  //     // if any range is under a threshold, back up, turning toward longer
+  //     // (calculate using indices) NOTE: there is an obstacle right behind
+  //     the
+  //     // robot, so it can't back up much recommended speeds (sim): x=0.1,
+  //     z=0.5
+  //     // whichever range is larger
+  //     //   rotate robot to half-profile to cart (calculate using indices)
+  //     //   move slowly until ranges within tolerance
+  //     // send static TF to "tf_laser_origin"
+  //     // move to "tf_laser_origin" (go_to_frame())
+  //     // rotate until edge indices equidistant from front index (541)
+
+  //     // NOTE: can monitor distances going forward or backward, so:
+
+  //     //
+  //   }
+  return false;
 }
 
 bool CartApproach::cart_pick_up_cb() {
@@ -1000,6 +1026,8 @@ bool CartApproach::cart_pick_up_cb() {
       Pick up cart
       Back to "tf_load_pos" (go_to_frame())
   */
+
+  return false;
 }
 
 /*
