@@ -1052,7 +1052,7 @@ bool CartApproach::get_reflective_plate_edges(int &left_ix, int &right_ix,
 
   // 4. Inner edges ray indices
   // Note: The segments are sorted, externally and internally
-  left_ix = reflective_vector_set[0][num_reflective_plates - 1];
+  left_ix = reflective_vector_set[0][reflective_vector_set[0].size() - 1];
   right_ix = reflective_vector_set[1][0];
 
   // 5. Inner edges ranges
@@ -1092,6 +1092,17 @@ bool CartApproach::face_cart() {
     RCLCPP_ERROR(this->get_logger(),
                  "Could not identified 2 reflective plates");
   }
+
+  // NOTE:
+  // The most important principle is to pass the laser through the lengthwise
+  // centerline of the cart and stop (ranges to edges equal within tolerance),
+  // move forward to compensate for laser offset and then rotate to get the
+  // two edge indices equidistant to front ix (541) (the robot will be facing
+  // straight in)
+  // This can be done with rotation toward the farther edge or rotation toward
+  // the closer edge and backing up.
+  // For the simulator, the robot should stay between 0.65 and 0.95 from the
+  // plate (need to solve the SAS triangle for more accurate values)
 
   /*
       Loop until edge ranges are equal
