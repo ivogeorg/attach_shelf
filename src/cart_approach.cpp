@@ -155,13 +155,13 @@ private:
   enum class RotationFrame { WORLD, ROBOT };
 
   // SIMULATOR
-    std::vector<double> init_position_ = {0.020047, -0.020043, -0.019467,
-                                          1.000000};
+  std::vector<double> init_position_ = {0.020047, -0.020043, -0.019467,
+                                        1.000000};
   // yaw = -0.0389291
 
   // LAB
-//   std::vector<double> init_position_ = {0.054368, 0.060027, -0.000433,
-//                                         1.000000};
+  //   std::vector<double> init_position_ = {0.054368, 0.060027, -0.000433,
+  //                                         1.000000};
   // yaw = -0.0073978
   /*
           {"init_position", {0.054368, 0.060027, -0.000433, 1.0000}},
@@ -178,12 +178,6 @@ private:
   inline void amcl_pose_callback(
       const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg);
   inline double get_current_yaw();
-
-  // cart service utilities
-  std::vector<std::vector<int>> segment(std::vector<int> &v,
-                                        const int threshold);
-  std::tuple<double, double, double>
-  solve_sas_triangle(double left_side, double right_side, double sas_angle);
 
   // navigation
   void publish_initial_pose();
@@ -209,11 +203,17 @@ private:
               double ang_tolerance, std::shared_ptr<tf2_ros::Buffer> tf_buff,
               rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr vel_pub);
 
-  // services
+  // cart services
   bool cart_pick_up_cb();
   bool cart_set_down_cb();
 
-  // service utilities
+  // cart service utilities
+  std::vector<std::vector<int>> segment(std::vector<int> &v,
+                                        const int threshold);
+  std::tuple<double, double, double>
+  solve_sas_triangle(double left_side, double right_side, double sas_angle);
+  bool get_reflective_plate_edges(int &left_ix, int &right_ix,
+                                  double &left_range, double &right_range);
   bool face_cart();
 
   // misc utilities
@@ -231,19 +231,18 @@ private:
   // TODO: Parametrize!!!
   const std::map<std::string, std::tuple<double, double, double, double>>
       // SIMULATOR:
-        poses = {
-            {"init_position", {0.020047, -0.020043, -0.019467, 1.000000}},
-            {"loading_position", {5.653875, -0.186439, -0.746498, 0.665388}},
-            {"face_shipping_position", {2.552175, -0.092728, 0.715685,
-            0.698423}},
-            {"shipping_position", {2.577595, 0.901998, 0.698087, 0.716013}}};
+      poses = {
+          {"init_position", {0.020047, -0.020043, -0.019467, 1.000000}},
+          {"loading_position", {5.653875, -0.186439, -0.746498, 0.665388}},
+          {"face_shipping_position", {2.552175, -0.092728, 0.715685, 0.698423}},
+          {"shipping_position", {2.577595, 0.901998, 0.698087, 0.716013}}};
 
-      // LAB:
-    //   poses = {
-    //       {"init_position", {0.054368, 0.060027, -0.000433, 1.0000}},
-    //       {"loading_position", {4.472548, -0.187311, -0.694903, 0.719103}},
-    //       {"face_shipping_position", {1.879749, 0.141987, 0.656541, 0.754290}},
-    //       {"shipping_position", {1.878660, 1.114233, 0.706215, 0.707997}}};
+  // LAB:
+  //   poses = {
+  //       {"init_position", {0.054368, 0.060027, -0.000433, 1.0000}},
+  //       {"loading_position", {4.472548, -0.187311, -0.694903, 0.719103}},
+  //       {"face_shipping_position", {1.879749, 0.141987, 0.656541, 0.754290}},
+  //       {"shipping_position", {1.878660, 1.114233, 0.706215, 0.707997}}};
 
   geometry_msgs::msg::TransformStamped tf_stamped_load_pos_;
   geometry_msgs::msg::TransformStamped tf_stamped_face_ship_pos_;
@@ -280,9 +279,9 @@ CartApproach::CartApproach()
 
       // TODO: Parametrize!!!
       // SIMULATOR
-        cmd_vel_topic_name_{"/diffbot_base_controller/cmd_vel_unstamped"},
+      cmd_vel_topic_name_{"/diffbot_base_controller/cmd_vel_unstamped"},
       // LAB
-    //   cmd_vel_topic_name_{"cmd_vel"},
+      //   cmd_vel_topic_name_{"cmd_vel"},
 
       vel_pub_{this->create_publisher<geometry_msgs::msg::Twist>(
           cmd_vel_topic_name_, 1)},
@@ -975,6 +974,102 @@ double CartApproach::clip_speed(double value, double min, double max) {
   return (value > 0) ? speed : -speed;
 }
 
+/**
+ * @brief Segments a sorted linear collection of numbers
+ * @param v a vector of integers to segment
+ * @param threshold the minimum distance between segments
+ * @return A vector of vectors each holding a segment
+ */
+std::vector<std::vector<int>>
+CartApproach::segment(std::vector<int> &v, const int threshold) {
+  std::vector<std::vector<int>> vector_set;
+
+  std::sort(v.begin(), v.end());
+
+  int last = 0;
+  std::vector<int> vec;
+  for (auto &p : v) {
+    if (p - last != p) { // not the first point
+      if (p - last < threshold) {
+        vec.push_back(p);
+      } else {
+        vector_set.push_back(vec);
+        // vec is copied, so can continue using it
+        vec.clear();
+        vec.push_back(p);
+      }
+    } else {
+      vec.push_back(p); // first point, so just insert
+    }
+    last = p;
+  }
+  vector_set.push_back(vec);
+
+  return vector_set;
+}
+
+/**
+ * @brief Detects the reflective plates by intensity.
+ * Detects the reflective plates by segmenting them by intensity. Assuming
+ * two sets. If not, return failure. Otherwise, identifies the inner edges
+ * and assigns their indices and ranges.
+ * @return Success of failure
+ */
+bool CartApproach::get_reflective_plate_edges(int &left_ix, int &right_ix,
+                                              double &left_range,
+                                              double &right_range) {
+  // 1. Detect reflective plates.
+  std::vector<int> reflective_point_indices;
+  for (int i = 0; i < static_cast<int>(last_laser_.intensities.size()); ++i)
+    // if (last_laser_.intensities[i] == REFLECTIVE_INTENSITY_VALUE)
+    if (last_laser_.intensities[i] > REFLECTIVE_INTENSITY_THRESHOLD)
+      reflective_point_indices.push_back(i);
+
+  // 1.1 If none, return with complete=False
+  if (reflective_point_indices.size() == 0) {
+    RCLCPP_ERROR(this->get_logger(),
+                 "Did not detect any cart reflective plates");
+    return false;
+  }
+
+  // 2. Segment the set
+  std::vector<std::vector<int>> reflective_vector_set;
+  reflective_vector_set =
+      segment(reflective_point_indices, POINT_DIST_THRESHOLD);
+
+  unsigned int num_reflective_plates =
+      static_cast<unsigned int>(reflective_vector_set.size());
+
+  RCLCPP_DEBUG(this->get_logger(), "Segmented reflective points into %d sets",
+               num_reflective_plates);
+
+  // 3. If only one, return with complete=False
+  if (num_reflective_plates < 2) {
+    RCLCPP_ERROR(this->get_logger(),
+                 "Did not detect two cart reflective plates");
+    return false;
+  }
+
+  // 4. Inner edges ray indices
+  // Note: The segments are sorted, externally and internally
+  left_ix = reflective_vector_set[0][num_reflective_plates - 1];
+  right_ix = reflective_vector_set[1][0];
+
+  // 5. Inner edges ranges
+  left_range = last_laser_.ranges[left_ix];
+  right_range = last_laser_.ranges[right_ix];
+
+  return true;
+}
+
+/**
+ * @brief Algorithm to get the robot to face the cart straight in.
+ * Uses the difference in the ranges to the two inner edges of the
+ * reflective plates to center the robot. This may take multiple
+ * attempts. Once done, sends TFs "tf_cart_from_midpoint" and
+ * "tf_cart_centerpoint".
+ * @return Success or failure
+ */
 bool CartApproach::face_cart() {
   /*
       TODO
@@ -982,6 +1077,21 @@ bool CartApproach::face_cart() {
       Loop to face straight in
       Send TF "tf_cart_front_midpoint" and "tf_cart_centerpoint"
   */
+
+  int left_edge_ix = 0, right_edge_ix = 0;
+  double left_edge_range = 0.0, right_edge_range = 0.0;
+
+  bool done = false;
+  if ((done = get_reflective_plate_edges(left_edge_ix, right_edge_ix,
+                                         left_edge_range, right_edge_range))) {
+    RCLCPP_DEBUG(
+        this->get_logger(),
+        "Identified reflective plates: left edge %f (%d), right edge %f (%d)",
+        left_edge_range, left_edge_ix, right_edge_range, right_edge_ix);
+  } else {
+    RCLCPP_ERROR(this->get_logger(),
+                 "Could not identified 2 reflective plates");
+  }
 
   /*
       Loop until edge ranges are equal
@@ -1015,6 +1125,16 @@ bool CartApproach::face_cart() {
   return false;
 }
 
+/**
+ * @brief Main service callback for picking up the cart.
+ * Assuming the robot is at the loading position and facing approximately
+ * the front side of the cart, the service sends a static TF of the
+ * robot's exact position, uses the reflective plates to center the robot
+ * to face straight in, publishes TFs for the cart's front midpoint and
+ * the cart's centerpoint, uses these TFs to approach and go under the
+ * cart, picks up the cart, and backs up to the TF it first sent.
+ * @return Success of failure
+ */
 bool CartApproach::cart_pick_up_cb() {
   /*
       TODO
@@ -1026,8 +1146,10 @@ bool CartApproach::cart_pick_up_cb() {
       Pick up cart
       Back to "tf_load_pos" (go_to_frame())
   */
+  bool done = false;
+  done = face_cart();
 
-  return false;
+  return done;
 }
 
 /*
@@ -1133,8 +1255,46 @@ void CartApproach::test_cart_approach() {
   //                       FORWARD to "tf_ship_pos",
   //                       BACKWARD to "tf_face_ship_pos",
   //                       BACKWARD to "tf_init_pos"
+  //   RCLCPP_DEBUG(this->get_logger(), "Calling go_to_frame");
+  //   bool done = go_to_frame("robot_base_footprint", "tf_face_ship_pos",
+  //                           MotionDirection::FORWARD, 0.01, 0.3, 0.25, 0.4,
+  //                           0.05, 0.05, tf_buffer_, vel_pub_);
+  //   RCLCPP_INFO(this->get_logger(), "Finished go_to_frame. Success: %d",
+  //               static_cast<int>(done));
+
+  //   rclcpp::sleep_for(3s);
+
+  //   RCLCPP_DEBUG(this->get_logger(), "Calling go_to_frame");
+  //   done = go_to_frame("robot_base_footprint", "tf_ship_pos",
+  //                      MotionDirection::FORWARD, 0.01, 0.3, 0.25, 0.4, 0.05,
+  //                      0.05, tf_buffer_, vel_pub_);
+  //   RCLCPP_INFO(this->get_logger(), "Finished go_to_frame. Success: %d",
+  //               static_cast<int>(done));
+
+  //   rclcpp::sleep_for(3s);
+
+  //   RCLCPP_DEBUG(this->get_logger(), "Calling go_to_frame");
+  //   done = go_to_frame("robot_base_footprint", "tf_face_ship_pos",
+  //                      MotionDirection::BACKWARD, 0.01, 0.15, 0.25, 0.4,
+  //                      0.05, 0.05, tf_buffer_, vel_pub_);
+  //   RCLCPP_INFO(this->get_logger(), "Finished test. Success: %d",
+  //               static_cast<int>(done));
+
+  //   rclcpp::sleep_for(3s);
+
+  //   RCLCPP_DEBUG(this->get_logger(), "Calling go_to_frame");
+  //   done = go_to_frame("robot_base_footprint", "tf_init_pos",
+  //                      MotionDirection::BACKWARD, 0.01, 0.15, 0.25, 0.4,
+  //                      0.05, 0.05, tf_buffer_, vel_pub_);
+  //   RCLCPP_INFO(this->get_logger(), "Finished test. Success: %d",
+  //               static_cast<int>(done));
+
+  // Test 7: go_to_frame() FORWARD  to "tf_face_ship_pos",
+  //                       FORWARD to "tf_ship_pos",
+  //                       BACKWARD to "tf_face_ship_pos",
+  //                       BACKWARD to "tf_init_pos"
   RCLCPP_DEBUG(this->get_logger(), "Calling go_to_frame");
-  bool done = go_to_frame("robot_base_footprint", "tf_face_ship_pos",
+  bool done = go_to_frame("robot_base_footprint", "tf_load_pos",
                           MotionDirection::FORWARD, 0.01, 0.3, 0.25, 0.4, 0.05,
                           0.05, tf_buffer_, vel_pub_);
   RCLCPP_INFO(this->get_logger(), "Finished go_to_frame. Success: %d",
@@ -1142,30 +1302,7 @@ void CartApproach::test_cart_approach() {
 
   rclcpp::sleep_for(3s);
 
-  RCLCPP_DEBUG(this->get_logger(), "Calling go_to_frame");
-  done = go_to_frame("robot_base_footprint", "tf_ship_pos",
-                     MotionDirection::FORWARD, 0.01, 0.3, 0.25, 0.4, 0.05, 0.05,
-                     tf_buffer_, vel_pub_);
-  RCLCPP_INFO(this->get_logger(), "Finished go_to_frame. Success: %d",
-              static_cast<int>(done));
-
-  rclcpp::sleep_for(3s);
-
-  RCLCPP_DEBUG(this->get_logger(), "Calling go_to_frame");
-  done = go_to_frame("robot_base_footprint", "tf_face_ship_pos",
-                     MotionDirection::BACKWARD, 0.01, 0.15, 0.25, 0.4, 0.05,
-                     0.05, tf_buffer_, vel_pub_);
-  RCLCPP_INFO(this->get_logger(), "Finished test. Success: %d",
-              static_cast<int>(done));
-
-  rclcpp::sleep_for(3s);
-
-  RCLCPP_DEBUG(this->get_logger(), "Calling go_to_frame");
-  done = go_to_frame("robot_base_footprint", "tf_init_pos",
-                     MotionDirection::BACKWARD, 0.01, 0.15, 0.25, 0.4, 0.05,
-                     0.05, tf_buffer_, vel_pub_);
-  RCLCPP_INFO(this->get_logger(), "Finished test. Success: %d",
-              static_cast<int>(done));
+  cart_pick_up_cb();
 }
 
 /* ***************** M    ***************** */

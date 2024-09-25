@@ -97,16 +97,22 @@ void IntensityPoker::laser_scan_callback(
     RCLCPP_INFO(this->get_logger(), "High intensity count = %d",
                 high_intensity_count);
 
+    // std::cout << "Reflective points with intensity (index:intensity) above "
+    //           << REFLECTIVE_INTENSITY_THRESHOLD << '\n';
+    // for (auto &p : reflective_points)
+    //   std::cout << p.first << ':' << p.second << '\n';
+    // std::cout << '\n';
+
     std::cout << "Reflective points with intensity (index:intensity) above "
               << REFLECTIVE_INTENSITY_THRESHOLD << '\n';
     for (auto &p : reflective_points)
-      std::cout << p.first << ':' << p.second << '\n';
+      std::cout << p.first << ':' << last_laser_.ranges[p.first] << '\n';
     std::cout << '\n';
 
-    std::cout << "All points with intensities (index:range-intensity\n";
-    for (int i = 0; i < static_cast<int>(last_laser_.ranges.size()); ++i)
-      std::cout << i << ':' << last_laser_.ranges[i] << '-'
-                << last_laser_.intensities[i] << '\n';
+    // std::cout << "All points with intensities (index:range-intensity\n";
+    // for (int i = 0; i < static_cast<int>(last_laser_.ranges.size()); ++i)
+    //   std::cout << i << ':' << last_laser_.ranges[i] << '-'
+    //             << last_laser_.intensities[i] << '\n';
 
     std::cout << '\n' << std::flush;
 
