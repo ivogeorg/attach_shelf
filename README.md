@@ -978,8 +978,11 @@ The `y` is off. The `x` and `yaw` seem to be fine.
 
 **Approach:**  
 1. Publishing TFs relative to `"robot_front_laser_base_link"`.  
-    1. Try different x, y, and yaw.  
-    2. Determine where the new TFs appear relative to `"robot_front_laser_base_link"` by labeling them to identify in Rviz2.  
+    1. New test, `tf_relative_to_laser.cpp`.
+    2. New launch, `relative.launch.py`.
+    3. `StaticTransformBroadcaster`.
+    4. Try different x, y, and yaw.  
+    5. Determine where the new TFs appear relative to `"robot_front_laser_base_link"` by labeling them to identify in Rviz2.  
 2. Continuously publishing `"tf_cart_front_midpoint"`.  
    1. New test, `cart_front_midpoint_test.cpp`.  
    2. New launch, `midpoint.launch.py`.  
