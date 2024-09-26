@@ -155,13 +155,13 @@ private:
   enum class RotationFrame { WORLD, ROBOT };
 
   // SIMULATOR
-  std::vector<double> init_position_ = {0.020047, -0.020043, -0.019467,
-                                        1.000000};
+    std::vector<double> init_position_ = {0.020047, -0.020043, -0.019467,
+                                          1.000000};
   // yaw = -0.0389291
 
   // LAB
-  //   std::vector<double> init_position_ = {0.054368, 0.060027, -0.000433,
-  //                                         1.000000};
+//   std::vector<double> init_position_ = {0.054368, 0.060027, -0.000433,
+//                                         1.000000};
   // yaw = -0.0073978
   /*
           {"init_position", {0.054368, 0.060027, -0.000433, 1.0000}},
@@ -182,16 +182,21 @@ private:
   // navigation
   void publish_initial_pose();
   void precise_autolocalization();
+  bool set_cart_approach_guidance();
+  void send_tf_cart_front_midpoint(double x, double y, double yaw);
+  void send_tf_cart_centerpoint(double x, double y, double yaw);
 
   /**
-   * @brief Rotational-only robot motion, based on `twist.angular.z` messages
+   * @brief Rotational-only robot motion, based on `twist.angular.z`
+   * messages
    * @param rad Degrees to turn
    * @param speed Speed of rotation in rad/s
    * @param angular_tolerance Determines the accuracy of rotation
    * @param frame World or robot frame
    * Contains an internal loop and blocks until rotation complete. Publishes
    * `geometry_msgs::msg::Twist` messages to topic `cmd_vel` or equivalent.
-   * Approaches the target angle depending on the sign so as never overshoot.
+   * Approaches the target angle depending on the sign so as never
+   * overshoot.
    */
   void rotate(double rad, double speed, double angular_tolerance,
               RotationFrame frame = RotationFrame::ROBOT);
@@ -214,7 +219,8 @@ private:
   solve_sas_triangle(double left_side, double right_side, double sas_angle);
   bool get_reflective_plate_edges(int &left_ix, int &right_ix,
                                   double &left_range, double &right_range);
-  bool face_cart();
+  bool cart_lift();
+  bool cart_drop();
 
   // misc utilities
   double clip_speed(double value, double min, double max);
@@ -231,18 +237,19 @@ private:
   // TODO: Parametrize!!!
   const std::map<std::string, std::tuple<double, double, double, double>>
       // SIMULATOR:
-      poses = {
-          {"init_position", {0.020047, -0.020043, -0.019467, 1.000000}},
-          {"loading_position", {5.653875, -0.186439, -0.746498, 0.665388}},
-          {"face_shipping_position", {2.552175, -0.092728, 0.715685, 0.698423}},
-          {"shipping_position", {2.577595, 0.901998, 0.698087, 0.716013}}};
+        poses = {
+            {"init_position", {0.020047, -0.020043, -0.019467, 1.000000}},
+            {"loading_position", {5.653875, -0.186439, -0.746498, 0.665388}},
+            {"face_shipping_position", {2.552175, -0.092728, 0.715685,
+            0.698423}},
+            {"shipping_position", {2.577595, 0.901998, 0.698087, 0.716013}}};
 
-  // LAB:
-  //   poses = {
-  //       {"init_position", {0.054368, 0.060027, -0.000433, 1.0000}},
-  //       {"loading_position", {4.472548, -0.187311, -0.694903, 0.719103}},
-  //       {"face_shipping_position", {1.879749, 0.141987, 0.656541, 0.754290}},
-  //       {"shipping_position", {1.878660, 1.114233, 0.706215, 0.707997}}};
+      // LAB:
+    //   poses = {
+    //       {"init_position", {0.054368, 0.060027, -0.000433, 1.0000}},
+    //       {"loading_position", {4.472548, -0.187311, -0.694903, 0.719103}},
+    //       {"face_shipping_position", {1.879749, 0.141987, 0.656541, 0.754290}},
+    //       {"shipping_position", {1.878660, 1.114233, 0.706215, 0.707997}}};
 
   geometry_msgs::msg::TransformStamped tf_stamped_load_pos_;
   geometry_msgs::msg::TransformStamped tf_stamped_face_ship_pos_;
@@ -279,9 +286,9 @@ CartApproach::CartApproach()
 
       // TODO: Parametrize!!!
       // SIMULATOR
-      cmd_vel_topic_name_{"/diffbot_base_controller/cmd_vel_unstamped"},
+        cmd_vel_topic_name_{"/diffbot_base_controller/cmd_vel_unstamped"},
       // LAB
-      //   cmd_vel_topic_name_{"cmd_vel"},
+    //   cmd_vel_topic_name_{"cmd_vel"},
 
       vel_pub_{this->create_publisher<geometry_msgs::msg::Twist>(
           cmd_vel_topic_name_, 1)},
@@ -517,7 +524,7 @@ void CartApproach::rotate(double goal_angle_rad, double speed,
 
   // DEBUG
   RCLCPP_DEBUG(this->get_logger(),
-               "(rotate) Angular difference from goal: %.2f",
+               "(rotate) Angular difference from goal: %.2f deg",
                abs(goal_angle - turn_angle) * 180.0 / PI_);
   // end DEBUG
 }
@@ -695,20 +702,11 @@ CartApproach::solve_sas_triangle(double l_side, double r_side,
   y = abs(y) * ((l_side > r_side) ? -1 : 1);
   yaw = abs(yaw) * ((l_side > r_side) ? 1 : -1);
 
-  /* NOTE:
-     1. x and y are for positioning crate_frame, yaw is not used in TF
-     2. yaw is for the robot to face crate_frame, and then rotate back
-
-     Essentially the TransformStamped's rotation will be ignored
-  */
-
   // Returning x_offset, y_offset, yaw
   //   RCLCPP_DEBUG(this->get_logger(),
   //                "Solve SAS triangle return: x=%f, y=%f, yaw=%f", x, y, yaw);
-  RCLCPP_INFO(
-      this->get_logger(),
-      "`cart_frame` TF from `robot_front_laser_base_link`: x=%f, y=%f, yaw=%f",
-      x, y, yaw);
+  RCLCPP_DEBUG(this->get_logger(), "(solve_sas_triangle) x=%f, y=%f, yaw=%f", x,
+               y, yaw);
   return std::make_tuple(x, y, yaw);
 }
 
@@ -758,6 +756,27 @@ III. ROS2 elements required
  *******************************/
 
 /* ***************** Test sandbox    ***************** */
+
+void CartApproach::send_tf_cart_front_midpoint(double x, double y, double yaw) {
+  static_tf_broadcaster_->sendTransform(tf_stamped_from_relative_coordinates(
+      this->get_clock()->now(), "map", "robot_front_laser_base_link",
+      "tf_cart_front_midpoint", x, y, yaw, tf_buffer_));
+
+  rclcpp::sleep_for(3s);
+}
+
+// SIMULATOR
+const double CART_CENTERPOINT_DEPTH = 0.45;
+// LAB
+// const double CART_CENTERPOINT_DEPTH = 0.30;
+
+void CartApproach::send_tf_cart_centerpoint(double x, double y, double yaw) {
+  static_tf_broadcaster_->sendTransform(tf_stamped_from_relative_coordinates(
+      this->get_clock()->now(), "map", "tf_cart_front_midpoint",
+      "tf_cart_centerpoint", x, y, yaw, tf_buffer_));
+
+  rclcpp::sleep_for(3s);
+}
 
 void CartApproach::publish_laser_origin_offset() {
   geometry_msgs::msg::TransformStamped ts_msg_base_to_laser =
@@ -980,8 +999,8 @@ double CartApproach::clip_speed(double value, double min, double max) {
  * @param threshold the minimum distance between segments
  * @return A vector of vectors each holding a segment
  */
-std::vector<std::vector<int>>
-CartApproach::segment(std::vector<int> &v, const int threshold) {
+std::vector<std::vector<int>> CartApproach::segment(std::vector<int> &v,
+                                                    const int threshold) {
   std::vector<std::vector<int>> vector_set;
 
   std::sort(v.begin(), v.end());
@@ -1063,14 +1082,69 @@ bool CartApproach::get_reflective_plate_edges(int &left_ix, int &right_ix,
 }
 
 /**
- * @brief Algorithm to get the robot to face the cart straight in.
+ * @brief Publishes to the /elevator_up topic to lift the cart.
+ * @return Success or failure
+ * There isn't any apparent way to know if the elevator is up or not.
+ */
+bool CartApproach::cart_lift() {
+  std_msgs::msg::String msg;
+  msg.data = "";
+
+  rclcpp::Rate pub_rate(1); // Hz
+  int pub_counter = 0;
+  const int PUB_TIMES = 5;
+  while (rclcpp::ok()) {
+    elev_up_pub_->publish(msg);
+    if (++pub_counter == PUB_TIMES)
+      break;
+    pub_rate.sleep();
+  }
+  // TODO: Any way to check?
+  return true;
+}
+
+/**
+ * @brief Publishes to the /elevator_down topic to drop the cart.
+ * @return Success or failure
+ * There isn't any apparent way to know if the elevator is up or not.
+ */
+bool CartApproach::cart_drop() {
+  std_msgs::msg::String msg;
+  msg.data = "";
+
+  rclcpp::Rate pub_rate(1); // Hz
+  int pub_counter = 0;
+  const int PUB_TIMES = 5;
+  while (rclcpp::ok()) {
+    elev_down_pub_->publish(msg);
+    if (++pub_counter == PUB_TIMES)
+      break;
+    pub_rate.sleep();
+  }
+  // TODO: Any way to check?
+  return true;
+}
+
+const double EDGE_RANGE_DIFF_TOLERANCE = 0.02;
+const double PLATE_RANGE_MIN = 0.65;
+const double PLATE_RANGE_MAX = 0.95;
+
+const int FRONT_IX = 541;
+/**
+ * @brief Algorithm to set guidance for the cart approach.
  * Uses the difference in the ranges to the two inner edges of the
- * reflective plates to center the robot. This may take multiple
- * attempts. Once done, sends TFs "tf_cart_from_midpoint" and
- * "tf_cart_centerpoint".
+ * reflective plates to calculate where the "tf_cart_from_midpoint"
+ * should be, after which the "tf_cart_centerpoint". Sends the TFs.
  * @return Success or failure
  */
-bool CartApproach::face_cart() {
+
+// TODO: Parametrize the distance between tf_cart_front_midpoint and
+// tf_cart_centerpoint
+//       Should be related to local_costmap/fooprint
+//       Lab: ~0.27 (crate is more square than the one in the sim)
+//       Sim: ~0.30 (not so important because of the implementation of
+//       /elevator_up subscriber)
+bool CartApproach::set_cart_approach_guidance() {
   /*
       TODO
       ====
@@ -1080,18 +1154,82 @@ bool CartApproach::face_cart() {
 
   int left_edge_ix = 0, right_edge_ix = 0;
   double left_edge_range = 0.0, right_edge_range = 0.0;
-
   bool done = false;
+
   if ((done = get_reflective_plate_edges(left_edge_ix, right_edge_ix,
                                          left_edge_range, right_edge_range))) {
     RCLCPP_DEBUG(
         this->get_logger(),
         "Identified reflective plates: left edge %f (%d), right edge %f (%d)",
         left_edge_range, left_edge_ix, right_edge_range, right_edge_ix);
+    // TODO: Verify this gives the correct direction (+ to the left, - to the
+    // right)
+    // double angle_rotate_to_face_cart =
+    //     ((FRONT_IX - left_edge_ix) - (right_edge_ix - FRONT_IX)) *
+    //     last_laser_.angle_increment;
+    // rotate(angle_rotate_to_face_cart, 0.1, 0.05, RotationFrame::ROBOT);
+    // done = get_reflective_plate_edges(left_edge_ix, right_edge_ix,
+    //                                   left_edge_range, right_edge_range);
+    // RCLCPP_DEBUG(
+    //     this->get_logger(),
+    //     "Identified reflective plates: left edge %f (%d), right edge %f
+    //     (%d)", left_edge_range, left_edge_ix, right_edge_range,
+    //     right_edge_ix);
+    double x, y, yaw;
+    std::tie(x, y, yaw) = solve_sas_triangle(left_edge_range, right_edge_range,
+                                             (right_edge_ix - left_edge_ix) *
+                                                 last_laser_.angle_increment);
+    RCLCPP_INFO(this->get_logger(),
+                "Sending TF \"tf_cart_front_midpoint\" with relative "
+                "coordinates {x: %f, y: %f, yaw: %f}",
+                x, y, yaw);
+    // Note: The 'yaw' returned by 'solve_sas_triangle' is the angle
+    //       between the height from the laser origin to the line
+    //       between the plates and the line from the laser origin to
+    //       the midpoint of the line. It needs to be negated to set
+    //       the TF to "point straight in"
+    // send_tf_cart_front_midpoint(x, y, -yaw);
+
+    // TODO: The 'y' seems to be off, almost the other way
+    send_tf_cart_front_midpoint(x, y, -yaw);
+
+    RCLCPP_INFO(this->get_logger(),
+                "Sending TF \"tf_cart_centerpoint\" with relative "
+                "coordinates {x: %f, y: %f, yaw: %f}",
+                CART_CENTERPOINT_DEPTH, 0.0, 0.0);
+    send_tf_cart_centerpoint(CART_CENTERPOINT_DEPTH, 0.0, 0.0);
   } else {
     RCLCPP_ERROR(this->get_logger(),
                  "Could not identified 2 reflective plates");
   }
+
+  //   rclcpp::Rate loop_rate(10);
+  //   while (rclcpp::ok()) {
+  //     if ((done = get_reflective_plate_edges(
+  //              left_edge_ix, right_edge_ix, left_edge_range,
+  //              right_edge_range))) {
+  //       RCLCPP_DEBUG(
+  //           this->get_logger(),
+  //           "Identified reflective plates: left edge %f (%d), right edge %f
+  //           (%d)", left_edge_range, left_edge_ix, right_edge_range,
+  //           right_edge_ix);
+  //       if (abs(left_edge_range - right_edge_range) <=
+  //           EDGE_RANGE_DIFF_TOLERANCE) {
+  //         RCLCPP_INFO(this->get_logger(), "Edge ranges equidistant!");
+  //         break;
+  //       }
+  //     } else {
+  //       RCLCPP_ERROR(this->get_logger(),
+  //                    "Could not identified 2 reflective plates");
+  //     }
+  //     loop_rate.sleep();
+  //   }
+
+  // NOTE:
+  // All we need is a loop on the near equality of the edge ranges with
+  // repositioning attempts
+
+  // Then solve the SAS triangle and send the "tf_cart_*" TF frames
 
   // NOTE:
   // The most important principle is to pass the laser through the lengthwise
@@ -1133,7 +1271,7 @@ bool CartApproach::face_cart() {
 
   //     //
   //   }
-  return false;
+  return done;
 }
 
 /**
@@ -1147,20 +1285,52 @@ bool CartApproach::face_cart() {
  * @return Success of failure
  */
 bool CartApproach::cart_pick_up_cb() {
-  /*
-      TODO
-      ====
-      Send TF "tf_load_pos" where stopped after BN.goToPose()
-      Face cart
-      Approach "tf_cart_front_midpoint" (go_to_frame())
-      Approach "tf_cart_centerpoint" (go_to_frame())
-      Pick up cart
-      Back to "tf_load_pos" (go_to_frame())
-  */
-  bool done = false;
-  done = face_cart();
+  if (set_cart_approach_guidance()) {
 
-  return done;
+    RCLCPP_INFO(this->get_logger(), "Approaching cart...");
+    if (go_to_frame("robot_base_footprint", "tf_cart_front_midpoint",
+                    MotionDirection::FORWARD, 0.01, 0.08, 0.25, 0.4, 0.05, 0.05,
+                    tf_buffer_, vel_pub_)) {
+      RCLCPP_INFO(this->get_logger(), "Completed!");
+    } else {
+      RCLCPP_ERROR(this->get_logger(), "Could not complete! Aborting!");
+      return false;
+    }
+
+    RCLCPP_INFO(this->get_logger(), "Going under cart...");
+    if (go_to_frame("robot_base_footprint", "tf_cart_centerpoint",
+                    MotionDirection::FORWARD, 0.01, 0.08, 0.25, 0.4, 0.05, 0.05,
+                    tf_buffer_, vel_pub_)) {
+      RCLCPP_INFO(this->get_logger(), "Completed!");
+    } else {
+      RCLCPP_ERROR(this->get_logger(), "Could not complete! Aborting!");
+      return false;
+    }
+
+    RCLCPP_INFO(this->get_logger(), "Attaching to cart...");
+    if (cart_lift()) {
+      RCLCPP_INFO(this->get_logger(), "Completed!");
+    } else {
+      RCLCPP_ERROR(this->get_logger(), "Could not complete! Aborting!");
+      return false;
+    }
+
+    RCLCPP_INFO(this->get_logger(), "Backing up with cart...");
+    if (go_to_frame("robot_base_footprint", "tf_load_pos",
+                    MotionDirection::BACKWARD, 0.01, 0.08, 0.25, 0.4, 0.05,
+                    0.05, tf_buffer_, vel_pub_)) {
+      RCLCPP_INFO(this->get_logger(), "Completed!");
+    } else {
+      RCLCPP_ERROR(this->get_logger(), "Could not complete! Aborting!");
+      return false;
+    }
+  } else {
+    RCLCPP_ERROR(this->get_logger(),
+                 "Could not set cart approach guidance! Aborting!");
+    return false;
+  }
+
+  return true;
 }
 
 /*

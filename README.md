@@ -966,5 +966,13 @@ The hack of non-positive `update_min_a` and `update_min_d` parameters for AMCL d
 
 ![Negative eigenvalue in posigion](assets/negative_eigenvalue_for_position_lab.png)  
 
+##### 12. Normal to line between reflective plates
 
+**Gist:**  
+The TF `"tf_cart_front_midpoint"` should have orientation that is normal to the line between the plates. This might be the `yaw` that is returned by `solve_sas_triangle`, but what is the angle that is passed to `StaticTransformBroadcaster`?
+
+##### 13. `"tf_cart_front_midpoint"` coordinates are off
+
+**Gist:**  
+The `y` is off. The `x` and `yaw` seem to be fine.
 

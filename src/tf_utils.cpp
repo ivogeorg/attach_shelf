@@ -7,25 +7,33 @@
 
 #include "attach_shelf/tf_utils.hpp"
 
+#include <cmath>
 #include <string>
 #include <tuple>
 #include <utility>
 
 #include "builtin_interfaces/msg/detail/time__struct.hpp"
 #include "geometry_msgs/msg/detail/pose_stamped__struct.hpp"
+#include "geometry_msgs/msg/detail/quaternion__struct.hpp"
 #include "geometry_msgs/msg/detail/transform_stamped__struct.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
+#include "geometry_msgs/msg/quaternion.hpp"
 #include "geometry_msgs/msg/transform_stamped.hpp"
 
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp/utilities.hpp"
 
+#include "tf2/LinearMath/Quaternion.h"
 #include "tf2/LinearMath/Transform.h"
 #include "tf2/LinearMath/Vector3.h"
+#include "tf2/convert.h"
 #include "tf2/exceptions.h"
 #include "tf2_ros/buffer.h"
 
-// ///////////////// UTILITIES /////////////////
+// forward declarations
+geometry_msgs::msg::Quaternion quaternion_from_yaw(double yaw);
+
+// library function definitions
 geometry_msgs::msg::TransformStamped
 tf_stamped_from_pose_stamped(const geometry_msgs::msg::PoseStamped pose,
                              const std::string child_frame_id) {
@@ -111,22 +119,22 @@ geometry_msgs::msg::TransformStamped tf_stamped_from_composition(
   ts_msg.header.frame_id = left_frame_id;
   ts_msg.child_frame_id = right_frame_id;
 
-  RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Left ts_msg frame_id = \"%s\"",
-              left.header.frame_id.c_str());
-  RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
-              "Left ts_msg child_frame_id = \"%s\"",
-              left.child_frame_id.c_str());
-  RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Right ts_msg frame_id = \"%s\"",
-              right.header.frame_id.c_str());
-  RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
-              "Right ts_msg child_frame_id = \"%s\"",
-              right.child_frame_id.c_str());
-  RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
-              "Composition ts_msg frame_id = \"%s\"",
-              ts_msg.header.frame_id.c_str());
-  RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
-              "Composition ts_msg child_frame_id = \"%s\"",
-              ts_msg.child_frame_id.c_str());
+//   RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Left ts_msg frame_id = \"%s\"",
+//               left.header.frame_id.c_str());
+//   RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
+//               "Left ts_msg child_frame_id = \"%s\"",
+//               left.child_frame_id.c_str());
+//   RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Right ts_msg frame_id = \"%s\"",
+//               right.header.frame_id.c_str());
+//   RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
+//               "Right ts_msg child_frame_id = \"%s\"",
+//               right.child_frame_id.c_str());
+//   RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
+//               "Composition ts_msg frame_id = \"%s\"",
+//               ts_msg.header.frame_id.c_str());
+//   RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
+//               "Composition ts_msg child_frame_id = \"%s\"",
+//               ts_msg.child_frame_id.c_str());
 
   return ts_msg;
 }
@@ -218,3 +226,57 @@ tf_stamped_from_root_frame_to_composition_frame_3d(
   return tf_stamped_from_frame_to_frame_3d(root_frame_id, composition_frame_id,
                                            tf_buffer);
 }
+
+geometry_msgs::msg::TransformStamped tf_stamped_from_relative_coordinates(
+    builtin_interfaces::msg::Time stamp, std::string root_frame_id,
+    std::string origin_frame_id, std::string target_frame_id,
+    double origin_to_target_x, double origin_to_target_y,
+    double origin_to_target_yaw, std::shared_ptr<tf2_ros::Buffer> tf_buffer) {
+
+  // 1. Convert {yaw} to quaternion {z, w}
+  geometry_msgs::msg::Quaternion origin_to_target_q =
+      quaternion_from_yaw(origin_to_target_yaw);
+
+  // 2. make_pose relative to origin_frame_id with coordinates
+  geometry_msgs::msg::PoseStamped origin_to_target_coordinates_pose =
+      make_pose(stamp, origin_frame_id, origin_to_target_x, origin_to_target_y,
+                origin_to_target_q.z, origin_to_target_q.w);
+
+  // 3. tf_stamped_from_pose_stamped with target_frame_id  => this will be right
+  // side
+  geometry_msgs::msg::TransformStamped ts_msg_right_side =
+      tf_stamped_from_pose_stamped(origin_to_target_coordinates_pose,
+                                   target_frame_id);
+
+  // 4. tf_stamped_from_root_frame_to_composition_frame_3d with root_frame_id
+  // and origin_frame_id => this will be left side
+  geometry_msgs::msg::TransformStamped ts_msg_left_side =
+      tf_stamped_from_root_frame_to_composition_frame_3d(
+          root_frame_id, origin_frame_id, tf_buffer);
+
+  // 5. tf_stamped_from_composition with root_frame_id and target_frame_id
+  return tf_stamped_from_composition(root_frame_id, ts_msg_left_side,
+                                     target_frame_id, ts_msg_right_side);
+}
+
+geometry_msgs::msg::Quaternion quaternion_from_yaw(double yaw) {
+  double cy = cos(yaw * 0.5);
+  double sy = sin(yaw * 0.5);
+  geometry_msgs::msg::Quaternion q;
+  q.x = q.y = 0.0;
+  q.z = sy;
+  q.w = cy;
+  return q;
+}
+/*
+struct Quaternion {
+    double w, x, y, z;
+};
+
+Quaternion fromYaw(double yaw) {
+    // Assuming yaw is in radians
+    double cy = cos(yaw * 0.5);
+    double sy = sin(yaw * 0.5);
+
+    return Quaternion{cy, 0, 0, sy};
+}*/
