@@ -976,3 +976,12 @@ The TF `"tf_cart_front_midpoint"` should have orientation that is normal to the 
 **Gist:**  
 The `y` is off. The `x` and `yaw` seem to be fine.
 
+**Approach:**
+I. Publishing TFs relative to `"robot_front_laser_base_link"`.
+    1. Try different x, y, and yaw.
+    2. Determine where the new TFs appear relative to `"robot_front_laser_base_link"` by labeling them to identify in Rviz2.
+II. Continuously publishing `"tf_cart_front_midpoint"`.
+    1. New test, `cart_front_midpoint_test.cpp`.
+    2. New launch, `midpoint.launch.py`.
+    3. `TransformBroadcaster` in a loop.
+    4. If reflective plates recognized, publish `"tf_cart_front_midpoint"`. _Has to be in the right place and be fairly stable._bring
