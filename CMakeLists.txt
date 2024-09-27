@@ -73,6 +73,11 @@ add_executable(tf_relative_to_laser_test_node src/tf_relative_to_laser.cpp src/t
 target_include_directories(tf_relative_to_laser_test_node PUBLIC include)
 ament_target_dependencies(tf_relative_to_laser_test_node rclcpp geometry_msgs nav_msgs sensor_msgs tf2 tf2_ros std_msgs)
 
+# Relative dynamic TFs test
+add_executable(tf_relative_to_laser_dynamic_test_node src/tf_relative_to_laser_dynamic.cpp src/tf_utils.cpp)
+target_include_directories(tf_relative_to_laser_dynamic_test_node PUBLIC include)
+ament_target_dependencies(tf_relative_to_laser_dynamic_test_node rclcpp geometry_msgs nav_msgs sensor_msgs tf2 tf2_ros std_msgs)
+
 # Static-publish TFs
 add_executable(static_tf_broadcaster_from_pose src/static_publish_frames.cpp src/tf_utils.cpp)
 target_include_directories(static_tf_broadcaster_from_pose PUBLIC include)
@@ -98,6 +103,7 @@ install(TARGETS
 			cart_approach_test_node
 			tf_relative_to_laser_test_node
 			cart_front_midpoint_test_node
+			tf_relative_to_laser_dynamic_test_node
 	DESTINATION lib/${PROJECT_NAME}
 )
 

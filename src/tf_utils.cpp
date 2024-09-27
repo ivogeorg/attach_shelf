@@ -199,6 +199,8 @@ tf_stamped_from_composition_frame_to_target_frame_2d(
   return ts_msg;
 }
 
+// TODO: The error messages are commented out because they flood
+//        stdout. Should find a more graceful way to handle.
 geometry_msgs::msg::TransformStamped
 tf_stamped_from_frame_to_frame_3d(std::string from_frame_id,
                                   std::string to_frame_id,
@@ -209,17 +211,17 @@ tf_stamped_from_frame_to_frame_3d(std::string from_frame_id,
       ts_msg = tf_buffer->lookupTransform(from_frame_id, to_frame_id,
                                           tf2::TimePointZero);
     } catch (const tf2::TransformException &ex) {
-      RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
-                   "Could not transform from %s to %s: %s",
-                   from_frame_id.c_str(), to_frame_id.c_str(), ex.what());
+    //   RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
+    //                "Could not transform from %s to %s: %s",
+    //                from_frame_id.c_str(), to_frame_id.c_str(), ex.what());
       // return ts_msg;
     }
   }
   // TODO: needs work here
-  RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
-              "TF from \"%s\" to \"%s\": x=%f, y=%f", from_frame_id.c_str(),
-              to_frame_id.c_str(), ts_msg.transform.translation.x,
-              ts_msg.transform.translation.y);
+//   RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
+//               "TF from \"%s\" to \"%s\": x=%f, y=%f", from_frame_id.c_str(),
+//               to_frame_id.c_str(), ts_msg.transform.translation.x,
+//               ts_msg.transform.translation.y);
   return ts_msg;
 }
 
