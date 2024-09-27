@@ -145,4 +145,25 @@ geometry_msgs::msg::TransformStamped tf_stamped_from_relative_coordinates(
     double origin_to_target_x, double origin_to_target_y,
     double origin_to_target_yaw, std::shared_ptr<tf2_ros::Buffer> tf_buffer);
 
+/**
+ * @brief
+ * @param stamp
+ * @param root_frame_id
+ * @param origin_frame_id
+ * @param target_frame_id
+ * @param origin_to_target_x
+ * @param origin_to_target_y
+ * @param origin_to_target_roll
+ * @param origin_to_target_pitch
+ * @param origin_to_target_yaw
+ * @param tf_buffer
+ * @return
+ */
+geometry_msgs::msg::TransformStamped tf_stamped_from_relative_coordinates(
+    builtin_interfaces::msg::Time stamp, std::string root_frame_id,
+    std::string origin_frame_id, std::string target_frame_id,
+    double origin_to_target_x, double origin_to_target_y,
+    double origin_to_target_roll, double origin_to_target_pitch,
+    double origin_to_target_yaw, std::shared_ptr<tf2_ros::Buffer> tf_buffer);
+
 #endif // TF_UTILS_HPP__

@@ -34,28 +34,46 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 	# DEPENDENCIES sensor_msgs geometry_msgs
 )
 
+# Pre-approach
 add_executable(pre_approach_node src/pre_approach.cpp)
 ament_target_dependencies(pre_approach_node rclcpp geometry_msgs sensor_msgs nav_msgs)
 
+# Pre-approach 2
 add_executable(pre_approach_v2_node src/pre_approach_v2.cpp)
 ament_target_dependencies(pre_approach_v2_node rclcpp geometry_msgs sensor_msgs nav_msgs)
 
+# Laser poker
 add_executable(laser_scanner_poker_node src/laser_scanner_poker.cpp)
 ament_target_dependencies(laser_scanner_poker_node rclcpp sensor_msgs)
 
+# Intensity poker
 add_executable(intensity_poker_node src/intensity_poker.cpp)
 ament_target_dependencies(intensity_poker_node rclcpp sensor_msgs)
 
+# Approach service server
 add_executable(approach_shelf_service_server_node src/approach_service_server.cpp)
 ament_target_dependencies(approach_shelf_service_server_node rclcpp geometry_msgs nav_msgs sensor_msgs tf2 tf2_ros std_msgs)
 
+# Cart pick up
 add_executable(cart_pick_up_service_server_node src/cart_pick_up.cpp)
 ament_target_dependencies(cart_pick_up_service_server_node rclcpp geometry_msgs nav_msgs sensor_msgs tf2 tf2_ros std_msgs)
 
+# TF utils
 add_executable(cart_approach_test_node src/cart_approach.cpp src/tf_utils.cpp)
 target_include_directories(cart_approach_test_node PUBLIC include)
 ament_target_dependencies(cart_approach_test_node rclcpp geometry_msgs nav_msgs sensor_msgs tf2 tf2_ros std_msgs)
 
+# Cart front midpoint test
+add_executable(cart_front_midpoint_test_node src/tf_relative_to_laser.cpp src/tf_utils.cpp)
+target_include_directories(cart_front_midpoint_test_node PUBLIC include)
+ament_target_dependencies(cart_front_midpoint_test_node rclcpp geometry_msgs nav_msgs sensor_msgs tf2 tf2_ros std_msgs)
+
+# Relative TFs test
+add_executable(tf_relative_to_laser_test_node src/tf_relative_to_laser.cpp src/tf_utils.cpp)
+target_include_directories(tf_relative_to_laser_test_node PUBLIC include)
+ament_target_dependencies(tf_relative_to_laser_test_node rclcpp geometry_msgs nav_msgs sensor_msgs tf2 tf2_ros std_msgs)
+
+# Static-publish TFs
 add_executable(static_tf_broadcaster_from_pose src/static_publish_frames.cpp src/tf_utils.cpp)
 target_include_directories(static_tf_broadcaster_from_pose PUBLIC include)
 ament_target_dependencies(static_tf_broadcaster_from_pose rclcpp geometry_msgs tf2 tf2_ros)
@@ -78,6 +96,8 @@ install(TARGETS
 			cart_pick_up_service_server_node
 			static_tf_broadcaster_from_pose
 			cart_approach_test_node
+			tf_relative_to_laser_test_node
+			cart_front_midpoint_test_node
 	DESTINATION lib/${PROJECT_NAME}
 )
 
