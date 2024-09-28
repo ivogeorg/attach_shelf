@@ -414,7 +414,11 @@ void CartApproach::broadcaster_cb() {
     }
     x = range * cos(theta); // cos(-t) = cos(t)
     y = range * sin(theta); // sin(-t) = -sin(t)
-    yaw = theta;
+
+    // Due to the 180-deg roll of robot_front_laser_base_link
+    y *= -1;
+    yaw = -theta;
+
     RCLCPP_DEBUG(this->get_logger(),
                  "(broadcaster_cb) TF \"%d\" at range %f and rel coords (x=%f, "
                  "y=%f, yaw=%f)",

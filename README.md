@@ -998,3 +998,9 @@ Published TFs which have to coincide with the incidnece contours in Rviz2 very r
 | Log + Gazebo | Rviz2 |
 | --- | --- |
 | ![Incidence bug (log, Gazebo)](assets/incidence_tf_bug_log_and_gazebo.png) | ![Incidence bug (Rviz2)](assets/incidence_tf_bug_rviz2.png) |
+
+**Solution:**  
+
+Compensate for 180-deg roll of `"robot_front_laser_base_link"`.  
+
+![Incidence bug fixed](assets/incidence_tf_bug_fixed_rviz2.png)  
