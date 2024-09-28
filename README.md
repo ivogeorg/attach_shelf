@@ -43,6 +43,9 @@ Table of Contents
 * [9. Going from pose to pose](#9-going-from-pose-to-pose)
 * [10. Oscillation on backing up](#10-oscillation-on-backing-up)
 * [11. Rviz2 and Gazebo out of synch](#11-rviz2-and-gazebo-out-of-synch)
+* [12. Normal to line between reflective plates](#12-normal-to-line-between-reflective-plates)
+* [13. "tf_cart_front_midpoint" coordinates are off](#13-tf_cart_front_midpoint-coordinates-are-off)
+* [14. Bug in incidence TF](#14-bug-in-incidence-tf)
 
 <!-- Created by https://github.com/ekalinin/github-markdown-toc -->
 
