@@ -265,7 +265,7 @@ private:
 
   rclcpp::TimerBase::SharedPtr test_timer_;
 
-  void test_relative_tfs();
+  void test_incidence_tfs();
   void publish_laser_origin_offset();
   void send_transforms_from_poses();
 };
@@ -321,7 +321,7 @@ CartApproach::CartApproach()
       broadcaster_timer_{this->create_wall_timer(
           100ms, std::bind(&CartApproach::broadcaster_cb, this), cb_group_)},
       test_timer_{this->create_wall_timer(
-          100ms, std::bind(&CartApproach::test_relative_tfs, this),
+          100ms, std::bind(&CartApproach::test_incidence_tfs, this),
           cb_group_)} {
   RCLCPP_INFO(this->get_logger(), "Cart approach testing sandbox started");
   init_broadcaster_tfs();
@@ -380,6 +380,7 @@ inline void CartApproach::amcl_pose_callback(
 }
 
 void CartApproach::init_broadcaster_tfs() {
+  // This will never show! :D
   RCLCPP_DEBUG(this->get_logger(), "Initializing incidence TFs");
 
   int front_ix = 541;
@@ -393,6 +394,12 @@ void CartApproach::init_broadcaster_tfs() {
 
 void CartApproach::broadcaster_cb() {
 
+  if (!have_scan_) {
+    RCLCPP_DEBUG(this->get_logger(),
+                 "(broadcaster_cb) Waiting for laser data...");
+    return;
+  }
+
   geometry_msgs::msg::TransformStamped ts_msg;
   int front_ix = 541;
   double theta, x, y, yaw, range;
@@ -400,9 +407,18 @@ void CartApproach::broadcaster_cb() {
   for (auto &ix : tf_vector) {
     theta = (front_ix - ix) * last_laser_.angle_increment;
     range = last_laser_.ranges[ix];
+    if (std::isinf(range)) {
+      RCLCPP_DEBUG(this->get_logger(),
+                   "(broadcaster_cb) TF \"%d\" at inf range", ix);
+      continue; // gets rid of TF_NAN_INPUT
+    }
     x = range * cos(theta); // cos(-t) = cos(t)
     y = range * sin(theta); // sin(-t) = -sin(t)
     yaw = theta;
+    RCLCPP_DEBUG(this->get_logger(),
+                 "(broadcaster_cb) TF \"%d\" at range %f and rel coords (x=%f, "
+                 "y=%f, yaw=%f)",
+                 ix, range, x, y, yaw);
     ts_msg = tf_stamped_from_relative_coordinates(
         this->get_clock()->now(), "map", "robot_front_laser_base_link",
         std::to_string(ix), x, y, yaw, tf_buffer_);
@@ -1384,12 +1400,12 @@ bool CartApproach::go_to_frame(
     std::shared_ptr<tf2_ros::Buffer> tf_buff,
     rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr vel_pub)
 */
-void CartApproach::test_relative_tfs() {
+void CartApproach::test_incidence_tfs() {
   // TODO
   // Broadcast "laser_origin_offset"
   // Move to that frame to tune the parameters of go_to_frame
 
-  RCLCPP_DEBUG(this->get_logger(), "test_relative_tfs");
+  RCLCPP_DEBUG(this->get_logger(), "test_incidence_tfs");
   this->test_timer_->cancel();
   RCLCPP_DEBUG(this->get_logger(), "Cancelled timer");
 
@@ -1399,8 +1415,8 @@ void CartApproach::test_relative_tfs() {
   // give time to nav2 stack to start and `map` frame to be published by AMCL
   rclcpp::sleep_for(10s);
 
-//   RCLCPP_INFO(this->get_logger(), "Publishing pose frames");
-//   send_transforms_from_poses();
+  RCLCPP_INFO(this->get_logger(), "Publishing pose frames");
+  send_transforms_from_poses();
 
   // TODO
   /*

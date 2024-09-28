@@ -988,3 +988,13 @@ The `y` is off. The `x` and `yaw` seem to be fine.
    2. New launch, `midpoint.launch.py`.  
    3. `TransformBroadcaster` in a loop.  
    4. If reflective plates recognized, publish `"tf_cart_front_midpoint"`. _Has to be in the right place and be fairly stable._  
+
+##### 13. Bug in incidence TF
+
+**Gist:**  
+
+Published TFs which have to coincide with the incidnece contours in Rviz2 very rarely coincide and are usually quite a bit off.   
+
+| Log + Gazebo | Rviz2 |
+| --- | --- |
+| ![Incidence bug (log, Gazebo)](assets/incidence_tf_bug_log_and_gazebo.png) | ![Incidence bug (Rviz2)](assets/incidence_tf_bug_rviz2.png) |

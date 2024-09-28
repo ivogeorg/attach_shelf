@@ -33,7 +33,7 @@
 // forward declarations
 geometry_msgs::msg::Quaternion quaternion_from_yaw(double yaw);
 geometry_msgs::msg::Quaternion quaternion_from_euler(double roll, double pitch,
-                                                      double yaw);
+                                                     double yaw);
 
 // library function definitions
 geometry_msgs::msg::TransformStamped
@@ -211,17 +211,18 @@ tf_stamped_from_frame_to_frame_3d(std::string from_frame_id,
       ts_msg = tf_buffer->lookupTransform(from_frame_id, to_frame_id,
                                           tf2::TimePointZero);
     } catch (const tf2::TransformException &ex) {
-    //   RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
-    //                "Could not transform from %s to %s: %s",
-    //                from_frame_id.c_str(), to_frame_id.c_str(), ex.what());
+        // RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
+        //              "Could not transform from %s to %s: %s",
+        //              from_frame_id.c_str(), to_frame_id.c_str(), ex.what());
       // return ts_msg;
     }
   }
   // TODO: needs work here
-//   RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
-//               "TF from \"%s\" to \"%s\": x=%f, y=%f", from_frame_id.c_str(),
-//               to_frame_id.c_str(), ts_msg.transform.translation.x,
-//               ts_msg.transform.translation.y);
+    // RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
+    //             "TF from \"%s\" to \"%s\": x=%f, y=%f",
+    //             from_frame_id.c_str(), to_frame_id.c_str(),
+    //             ts_msg.transform.translation.x,
+    //             ts_msg.transform.translation.y);
   return ts_msg;
 }
 
@@ -261,8 +262,20 @@ geometry_msgs::msg::TransformStamped tf_stamped_from_relative_coordinates(
           root_frame_id, origin_frame_id, tf_buffer);
 
   // 5. tf_stamped_from_composition with root_frame_id and target_frame_id
-  return tf_stamped_from_composition(root_frame_id, ts_msg_left_side,
-                                     target_frame_id, ts_msg_right_side);
+  geometry_msgs::msg::TransformStamped composition =
+      tf_stamped_from_composition(root_frame_id, ts_msg_left_side,
+                                  target_frame_id, ts_msg_right_side);
+
+  RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "(tf_utils) Returning TF (%f, %f, %f)(%f, %f, %f, %f)",
+               composition.transform.translation.x,
+               composition.transform.translation.y,
+               composition.transform.translation.z,
+               composition.transform.rotation.x,
+               composition.transform.rotation.y,
+               composition.transform.rotation.z,
+               composition.transform.rotation.w);
+
+  return composition;
 }
 
 geometry_msgs::msg::Quaternion quaternion_from_yaw(double yaw) {
@@ -275,58 +288,20 @@ geometry_msgs::msg::Quaternion quaternion_from_yaw(double yaw) {
   return q;
 }
 
-// geometry_msgs::msg::TransformStamped tf_stamped_from_relative_coordinates(
-//     builtin_interfaces::msg::Time stamp, std::string root_frame_id,
-//     std::string origin_frame_id, std::string target_frame_id,
-//     double origin_to_target_x, double origin_to_target_y,
-//     double origin_to_target_roll, double origin_to_target_pitch,
-//     double origin_to_target_yaw, std::shared_ptr<tf2_ros::Buffer> tf_buffer) {
-//     builtin_interfaces::msg::Time stamp, std::string root_frame_id,
-//     std::string origin_frame_id, std::string target_frame_id,
-//     double origin_to_target_x, double origin_to_target_y,
-//     double origin_to_target_yaw, std::shared_ptr<tf2_ros::Buffer> tf_buffer) {
+geometry_msgs::msg::Quaternion quaternion_from_euler(double roll, double pitch,
+                                                     double yaw) {
+  // Abbreviations for the various angular functions
+  double cy = cos(yaw * 0.5);
+  double sy = sin(yaw * 0.5);
+  double cp = cos(pitch * 0.5);
+  double sp = sin(pitch * 0.5);
+  double cr = cos(roll * 0.5);
+  double sr = sin(roll * 0.5);
 
-//       // 1. Convert {roll, pitch, yaw} to quaternion {z, w}
-//       geometry_msgs::msg::Quaternion origin_to_target_q =
-//           quaternion_from_euler(origin_to_target_yaw);
-
-//       // 2. make_pose relative to origin_frame_id with coordinates
-//       geometry_msgs::msg::PoseStamped origin_to_target_coordinates_pose =
-//           make_pose(stamp, origin_frame_id, origin_to_target_x,
-//                     origin_to_target_y, origin_to_target_q.z,
-//                     origin_to_target_q.w);
-
-//       // 3. tf_stamped_from_pose_stamped with target_frame_id  => this will be
-//       // right side
-//       geometry_msgs::msg::TransformStamped ts_msg_right_side =
-//           tf_stamped_from_pose_stamped(origin_to_target_coordinates_pose,
-//                                        target_frame_id);
-
-//       // 4. tf_stamped_from_root_frame_to_composition_frame_3d with
-//       // root_frame_id and origin_frame_id => this will be left side
-//       geometry_msgs::msg::TransformStamped ts_msg_left_side =
-//           tf_stamped_from_root_frame_to_composition_frame_3d(
-//               root_frame_id, origin_frame_id, tf_buffer);
-
-//       // 5. tf_stamped_from_composition with root_frame_id and target_frame_id
-//       return tf_stamped_from_composition(root_frame_id, ts_msg_left_side,
-//                                          target_frame_id, ts_msg_right_side);
-//     }
-
-    geometry_msgs::msg::Quaternion quaternion_from_euler(
-        double roll, double pitch, double yaw) {
-      // Abbreviations for the various angular functions
-      double cy = cos(yaw * 0.5);
-      double sy = sin(yaw * 0.5);
-      double cp = cos(pitch * 0.5);
-      double sp = sin(pitch * 0.5);
-      double cr = cos(roll * 0.5);
-      double sr = sin(roll * 0.5);
-
-      geometry_msgs::msg::Quaternion q;
-      q.w = cy * cp * cr + sy * sp * sr;
-      q.x = cy * cp * sr - sy * sp * cr;
-      q.y = sy * cp * sr + cy * sp * cr;
-      q.z = sy * cp * cr - cy * sp * sr;
-      return q;
-    }
+  geometry_msgs::msg::Quaternion q;
+  q.w = cy * cp * cr + sy * sp * sr;
+  q.x = cy * cp * sr - sy * sp * cr;
+  q.y = sy * cp * sr + cy * sp * cr;
+  q.z = sy * cp * cr - cy * sp * sr;
+  return q;
+}
