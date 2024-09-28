@@ -83,6 +83,11 @@ add_executable(scan_incidence_test_node src/scan_incidence_tf_test.cpp src/tf_ut
 target_include_directories(scan_incidence_test_node PUBLIC include)
 ament_target_dependencies(scan_incidence_test_node rclcpp geometry_msgs nav_msgs sensor_msgs tf2 tf2_ros std_msgs)
 
+# Reflective plates edges test
+add_executable(reflective_plates_edges_test_node src/reflective_plates_edges.cpp src/tf_utils.cpp)
+target_include_directories(reflective_plates_edges_test_node PUBLIC include)
+ament_target_dependencies(reflective_plates_edges_test_node rclcpp geometry_msgs nav_msgs sensor_msgs tf2 tf2_ros std_msgs)
+
 # Static-publish TFs
 add_executable(static_tf_broadcaster_from_pose src/static_publish_frames.cpp src/tf_utils.cpp)
 target_include_directories(static_tf_broadcaster_from_pose PUBLIC include)
@@ -110,6 +115,7 @@ install(TARGETS
 			cart_front_midpoint_test_node
 			tf_relative_to_laser_dynamic_test_node
 			scan_incidence_test_node
+			reflective_plates_edges_test_node
 	DESTINATION lib/${PROJECT_NAME}
 )
 
