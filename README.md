@@ -989,7 +989,7 @@ The `y` is off. The `x` and `yaw` seem to be fine.
    3. `TransformBroadcaster` in a loop.  
    4. If reflective plates recognized, publish `"tf_cart_front_midpoint"`. _Has to be in the right place and be fairly stable._  
 
-##### 13. Bug in incidence TF
+##### 14. Bug in incidence TF
 
 **Gist:**  
 
