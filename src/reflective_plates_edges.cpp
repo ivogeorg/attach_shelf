@@ -398,47 +398,64 @@ void CartApproach::broadcaster_cb() {
     std::vector<int> tf_vector = {left_ix, right_ix};
 
     geometry_msgs::msg::TransformStamped ts_msg;
-    int front_ix = 541, ix;
-    double theta, x, y, yaw, range;
+    int front_ix = 541;
+    double left_theta, right_theta, mid_theta, x, y, yaw;
 
     // left edge
-    ix = left_ix;
-    theta = (front_ix - ix) * last_laser_.angle_increment;
-    range = last_laser_.ranges[ix];
-    x = range * cos(theta); // cos(-t) = cos(t)
-    y = range * sin(theta); // sin(-t) = -sin(t)
+    left_theta = (front_ix - left_ix) * last_laser_.angle_increment;
+    x = left_range * cos(left_theta); // cos(-t) = cos(t)
+    y = left_range * sin(left_theta); // sin(-t) = -sin(t)
 
     // Due to the 180-deg roll of robot_front_laser_base_link
     y *= -1;
-    yaw = -theta;
+    yaw = -left_theta;
 
-    RCLCPP_DEBUG(this->get_logger(),
-                 "(broadcaster_cb) TF \"%d\" at range %f and rel coords (x=%f, "
-                 "y=%f, yaw=%f)",
-                 ix, range, x, y, yaw);
+    RCLCPP_DEBUG(
+        this->get_logger(),
+        "(broadcaster_cb) TF \"left_edge\" at range %f and rel coords (x=%f, "
+        "y=%f, yaw=%f)",
+        left_range, x, y, yaw);
     ts_msg = tf_stamped_from_relative_coordinates(
         this->get_clock()->now(), "map", "robot_front_laser_base_link",
         "left_edge", x, y, yaw, tf_buffer_);
     tf_broadcaster_->sendTransform(ts_msg);
 
     // right edge
-    ix = right_ix;
-    theta = (front_ix - ix) * last_laser_.angle_increment;
-    range = last_laser_.ranges[ix];
-    x = range * cos(theta); // cos(-t) = cos(t)
-    y = range * sin(theta); // sin(-t) = -sin(t)
+    right_theta = (front_ix - right_ix) * last_laser_.angle_increment;
+    x = right_range * cos(right_theta); // cos(-t) = cos(t)
+    y = right_range * sin(right_theta); // sin(-t) = -sin(t)
 
     // Due to the 180-deg roll of robot_front_laser_base_link
     y *= -1;
-    yaw = -theta;
+    yaw = -right_theta;
 
-    RCLCPP_DEBUG(this->get_logger(),
-                 "(broadcaster_cb) TF \"%d\" at range %f and rel coords (x=%f, "
-                 "y=%f, yaw=%f)",
-                 ix, range, x, y, yaw);
+    RCLCPP_DEBUG(
+        this->get_logger(),
+        "(broadcaster_cb) TF \"right_edge\" at range %f and rel coords (x=%f, "
+        "y=%f, yaw=%f)",
+        right_range, x, y, yaw);
     ts_msg = tf_stamped_from_relative_coordinates(
         this->get_clock()->now(), "map", "robot_front_laser_base_link",
         "right_edge", x, y, yaw, tf_buffer_);
+    tf_broadcaster_->sendTransform(ts_msg);
+
+    // midpoint
+    mid_theta = (right_ix - left_ix) / 2.0 * last_laser_.angle_increment;
+
+    x = (left_range * cos(left_theta) + right_range * cos(right_theta)) / 2.0;
+    y = (left_range * sin(left_theta) + right_range * sin(right_theta)) / 2.0;
+
+    // Due to the 180-deg roll of robot_front_laser_base_link
+    y *= -1;
+    yaw = -mid_theta;
+
+    RCLCPP_DEBUG(this->get_logger(),
+                 "(broadcaster_cb) TF \"midpoint\" at rel coords (x=%f, "
+                 "y=%f, yaw=%f)",
+                 x, y, yaw);
+    ts_msg = tf_stamped_from_relative_coordinates(
+        this->get_clock()->now(), "map", "robot_front_laser_base_link",
+        "midpoint", x, y, yaw, tf_buffer_);
     tf_broadcaster_->sendTransform(ts_msg);
   }
 }
