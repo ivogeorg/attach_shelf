@@ -755,7 +755,13 @@ This may take a few tries, where the robot backs up to start a new try. Here's a
 
 | Gazebo | Rviz2 |
 | --- | --- |
-| ![Midpoint in Gazebo](assets/midpoint_from_a_distance_gazebo.png) | ![Midpoint in Rviz2](assets/midpoint_from_a_distance_rviz2.png) |
+| ![Midpoint in Gazebo](assets/midpoint_from_a_distance_gazebo.png) | ![Midpoint in Rviz2](assets/midpoint_from_a_distance_rviz2.png) |   
+
+TFs unrolled:  
+| Gazebo | Rviz2 |
+| --- | --- |
+| ![Unrolled TFs in Gazebo](assets/unrolled_tfs_gazebo.png) | ![Untolled TFs in Rviz2](assets/unrolled_tfs_rviz2.png) |   
+
 
 ##### 3. Pick up the cart
 

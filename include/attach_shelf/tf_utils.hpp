@@ -31,21 +31,24 @@ tf_stamped_from_pose_stamped(const geometry_msgs::msg::PoseStamped pose,
  * @param parent_frame_id
  * @param position_x
  * @param position_y
+ * @param position_z
+ * @param orientation_x
+ * @param orientation_y
  * @param orientation_z
  * @param orientation_w
  * @return
  */
-geometry_msgs::msg::PoseStamped make_pose(builtin_interfaces::msg::Time stamp,
-                                          std::string parent_frame_id,
-                                          double position_x, double position_y,
-                                          double orientation_z,
-                                          double orientation_w);
+geometry_msgs::msg::PoseStamped
+make_pose(builtin_interfaces::msg::Time stamp, std::string parent_frame_id,
+          double position_x, double position_y, double position_z,
+          double orientation_x, double orientation_y, double orientation_z,
+          double orientation_w);
 
 /**
  * @brief
  * @param stamp
  * @param parent_frame_id
- * @param coords
+ * @param coords pos_x, pos_y, ori_z, ori_w
  * @return
  */
 geometry_msgs::msg::PoseStamped
@@ -145,25 +148,27 @@ geometry_msgs::msg::TransformStamped tf_stamped_from_relative_coordinates(
     double origin_to_target_x, double origin_to_target_y,
     double origin_to_target_yaw, std::shared_ptr<tf2_ros::Buffer> tf_buffer);
 
-// /**
-//  * @brief
-//  * @param stamp
-//  * @param root_frame_id
-//  * @param origin_frame_id
-//  * @param target_frame_id
-//  * @param origin_to_target_x
-//  * @param origin_to_target_y
-//  * @param origin_to_target_roll
-//  * @param origin_to_target_pitch
-//  * @param origin_to_target_yaw
-//  * @param tf_buffer
-//  * @return
-//  */
-// geometry_msgs::msg::TransformStamped tf_stamped_from_relative_coordinates(
-//     builtin_interfaces::msg::Time stamp, std::string root_frame_id,
-//     std::string origin_frame_id, std::string target_frame_id,
-//     double origin_to_target_x, double origin_to_target_y,
-//     double origin_to_target_roll, double origin_to_target_pitch,
-//     double origin_to_target_yaw, std::shared_ptr<tf2_ros::Buffer> tf_buffer);
+/**
+ * @brief
+ * @param stamp
+ * @param root_frame_id
+ * @param origin_frame_id
+ * @param target_frame_id
+ * @param origin_to_target_x
+ * @param origin_to_target_y
+ * @param origin_to_target_z
+ * @param origin_to_target_roll
+ * @param origin_to_target_pitch
+ * @param origin_to_target_yaw
+ * @param tf_buffer
+ * @return
+ */
+geometry_msgs::msg::TransformStamped tf_stamped_from_relative_coordinates_3d(
+    builtin_interfaces::msg::Time stamp, std::string root_frame_id,
+    std::string origin_frame_id, std::string target_frame_id,
+    double origin_to_target_x, double origin_to_target_y,
+    double origin_to_target_z, double origin_to_target_roll,
+    double origin_to_target_pitch, double origin_to_target_yaw,
+    std::shared_ptr<tf2_ros::Buffer> tf_buffer);
 
 #endif // TF_UTILS_HPP__

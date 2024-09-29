@@ -46,23 +46,29 @@ tf_stamped_from_pose_stamped(const geometry_msgs::msg::PoseStamped pose,
   tf_stamped.child_frame_id = child_frame_id;
   tf_stamped.transform.translation.x = pose.pose.position.x;
   tf_stamped.transform.translation.y = pose.pose.position.y;
+  tf_stamped.transform.translation.z = pose.pose.position.z;
+  tf_stamped.transform.rotation.x = pose.pose.orientation.x;
+  tf_stamped.transform.rotation.y = pose.pose.orientation.y;
   tf_stamped.transform.rotation.z = pose.pose.orientation.z;
   tf_stamped.transform.rotation.w = pose.pose.orientation.w;
 
   return tf_stamped;
 }
 
-geometry_msgs::msg::PoseStamped make_pose(builtin_interfaces::msg::Time stamp,
-                                          std::string parent_frame_id,
-                                          double position_x, double position_y,
-                                          double orientation_z,
-                                          double orientation_w) {
+geometry_msgs::msg::PoseStamped
+make_pose(builtin_interfaces::msg::Time stamp, std::string parent_frame_id,
+          double position_x, double position_y, double position_z,
+          double orientation_x, double orientation_y, double orientation_z,
+          double orientation_w) {
   geometry_msgs::msg::PoseStamped p;
 
   p.header.stamp = stamp;
   p.header.frame_id = parent_frame_id;
   p.pose.position.x = position_x;
   p.pose.position.y = position_y;
+  p.pose.position.z = position_z;
+  p.pose.orientation.x = orientation_x;
+  p.pose.orientation.y = orientation_y;
   p.pose.orientation.z = orientation_z;
   p.pose.orientation.w = orientation_w;
 
@@ -93,6 +99,9 @@ geometry_msgs::msg::PoseStamped make_pose(builtin_interfaces::msg::Time stamp,
   p.header.frame_id = parent_frame_id;
   p.pose.position.x = pose.position.x;
   p.pose.position.y = pose.position.y;
+  p.pose.position.z = pose.position.z;
+  p.pose.orientation.x = pose.orientation.x;
+  p.pose.orientation.y = pose.orientation.y;
   p.pose.orientation.z = pose.orientation.z;
   p.pose.orientation.w = pose.orientation.w;
 
@@ -211,18 +220,18 @@ tf_stamped_from_frame_to_frame_3d(std::string from_frame_id,
       ts_msg = tf_buffer->lookupTransform(from_frame_id, to_frame_id,
                                           tf2::TimePointZero);
     } catch (const tf2::TransformException &ex) {
-        // RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
-        //              "Could not transform from %s to %s: %s",
-        //              from_frame_id.c_str(), to_frame_id.c_str(), ex.what());
+      // RCLCPP_ERROR(rclcpp::get_logger("rclcpp"),
+      //              "Could not transform from %s to %s: %s",
+      //              from_frame_id.c_str(), to_frame_id.c_str(), ex.what());
       // return ts_msg;
     }
   }
   // TODO: needs work here
-    // RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
-    //             "TF from \"%s\" to \"%s\": x=%f, y=%f",
-    //             from_frame_id.c_str(), to_frame_id.c_str(),
-    //             ts_msg.transform.translation.x,
-    //             ts_msg.transform.translation.y);
+  // RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
+  //             "TF from \"%s\" to \"%s\": x=%f, y=%f",
+  //             from_frame_id.c_str(), to_frame_id.c_str(),
+  //             ts_msg.transform.translation.x,
+  //             ts_msg.transform.translation.y);
   return ts_msg;
 }
 
@@ -247,6 +256,52 @@ geometry_msgs::msg::TransformStamped tf_stamped_from_relative_coordinates(
   // 2. make_pose relative to origin_frame_id with coordinates
   geometry_msgs::msg::PoseStamped origin_to_target_coordinates_pose =
       make_pose(stamp, origin_frame_id, origin_to_target_x, origin_to_target_y,
+                0.0, 0.0, 0.0, origin_to_target_q.z, origin_to_target_q.w);
+
+  // 3. tf_stamped_from_pose_stamped with target_frame_id  => this will be right
+  // side
+  geometry_msgs::msg::TransformStamped ts_msg_right_side =
+      tf_stamped_from_pose_stamped(origin_to_target_coordinates_pose,
+                                   target_frame_id);
+
+  // 4. tf_stamped_from_root_frame_to_composition_frame_3d with root_frame_id
+  // and origin_frame_id => this will be left side
+  geometry_msgs::msg::TransformStamped ts_msg_left_side =
+      tf_stamped_from_root_frame_to_composition_frame_3d(
+          root_frame_id, origin_frame_id, tf_buffer);
+
+  // 5. tf_stamped_from_composition with root_frame_id and target_frame_id
+  geometry_msgs::msg::TransformStamped composition =
+      tf_stamped_from_composition(root_frame_id, ts_msg_left_side,
+                                  target_frame_id, ts_msg_right_side);
+
+  RCLCPP_DEBUG(
+      rclcpp::get_logger("rclcpp"),
+      "(tf_utils) Returning TF (%f, %f, %f)(%f, %f, %f, %f)",
+      composition.transform.translation.x, composition.transform.translation.y,
+      composition.transform.translation.z, composition.transform.rotation.x,
+      composition.transform.rotation.y, composition.transform.rotation.z,
+      composition.transform.rotation.w);
+
+  return composition;
+}
+
+geometry_msgs::msg::TransformStamped tf_stamped_from_relative_coordinates_3d(
+    builtin_interfaces::msg::Time stamp, std::string root_frame_id,
+    std::string origin_frame_id, std::string target_frame_id,
+    double origin_to_target_x, double origin_to_target_y,
+    double origin_to_target_z, double origin_to_target_roll,
+    double origin_to_target_pitch, double origin_to_target_yaw,
+    std::shared_ptr<tf2_ros::Buffer> tf_buffer) {
+
+  // 1. Convert {yaw} to quaternion {z, w}
+  geometry_msgs::msg::Quaternion origin_to_target_q = quaternion_from_euler(
+      origin_to_target_roll, origin_to_target_pitch, origin_to_target_yaw);
+
+  // 2. make_pose relative to origin_frame_id with coordinates
+  geometry_msgs::msg::PoseStamped origin_to_target_coordinates_pose =
+      make_pose(stamp, origin_frame_id, origin_to_target_x, origin_to_target_y,
+                origin_to_target_z, origin_to_target_q.x, origin_to_target_q.y,
                 origin_to_target_q.z, origin_to_target_q.w);
 
   // 3. tf_stamped_from_pose_stamped with target_frame_id  => this will be right
@@ -266,14 +321,14 @@ geometry_msgs::msg::TransformStamped tf_stamped_from_relative_coordinates(
       tf_stamped_from_composition(root_frame_id, ts_msg_left_side,
                                   target_frame_id, ts_msg_right_side);
 
-  RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "(tf_utils) Returning TF (%f, %f, %f)(%f, %f, %f, %f)",
-               composition.transform.translation.x,
-               composition.transform.translation.y,
-               composition.transform.translation.z,
-               composition.transform.rotation.x,
-               composition.transform.rotation.y,
-               composition.transform.rotation.z,
-               composition.transform.rotation.w);
+  // This won't show unless the "rclcpp" logger level is set to DEBUG
+  RCLCPP_DEBUG(
+      rclcpp::get_logger("rclcpp"),
+      "(tf_utils) Returning TF (%f, %f, %f)(%f, %f, %f, %f)",
+      composition.transform.translation.x, composition.transform.translation.y,
+      composition.transform.translation.z, composition.transform.rotation.x,
+      composition.transform.rotation.y, composition.transform.rotation.z,
+      composition.transform.rotation.w);
 
   return composition;
 }

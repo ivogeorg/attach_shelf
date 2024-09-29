@@ -275,7 +275,7 @@ private:
  * that topic subscribers can be properly added to it.
  */
 CartApproach::CartApproach()
-    : Node("reflective_plates_edges_test_node"),
+    : Node("unrolled_tfs_test_node"),
       cb_group_{
           this->create_callback_group(rclcpp::CallbackGroupType::Reentrant)},
       topic_pub_sub_options_{cb_group_},
@@ -399,7 +399,8 @@ void CartApproach::broadcaster_cb() {
 
     geometry_msgs::msg::TransformStamped ts_msg;
     int front_ix = 541;
-    double left_theta, right_theta, mid_theta, left_x, left_y, right_x, right_y, mid_x, mid_y, left_yaw, right_yaw, mid_yaw;
+    double left_theta, right_theta, mid_theta, left_x, left_y, right_x, right_y,
+        mid_x, mid_y, left_yaw, right_yaw, mid_yaw;
 
     // left edge
     left_theta = (front_ix - left_ix) * last_laser_.angle_increment;
@@ -415,9 +416,9 @@ void CartApproach::broadcaster_cb() {
         "(broadcaster_cb) TF \"left_edge\" at range %f and rel coords (x=%f, "
         "y=%f, yaw=%f)",
         left_range, left_x, left_y, left_yaw);
-    ts_msg = tf_stamped_from_relative_coordinates(
+    ts_msg = tf_stamped_from_relative_coordinates_3d(
         this->get_clock()->now(), "map", "robot_front_laser_base_link",
-        "left_edge", left_x, left_y, left_yaw, tf_buffer_);
+        "left_edge", left_x, left_y, 0.0, PI_, 0.0, left_yaw, tf_buffer_);
     tf_broadcaster_->sendTransform(ts_msg);
 
     // right edge
@@ -434,16 +435,19 @@ void CartApproach::broadcaster_cb() {
         "(broadcaster_cb) TF \"right_edge\" at range %f and rel coords (x=%f, "
         "y=%f, yaw=%f)",
         right_range, right_x, right_y, right_yaw);
-    ts_msg = tf_stamped_from_relative_coordinates(
+    ts_msg = tf_stamped_from_relative_coordinates_3d(
         this->get_clock()->now(), "map", "robot_front_laser_base_link",
-        "right_edge", right_x, right_y, right_yaw, tf_buffer_);
+        "right_edge", right_x, right_y, 0.0, PI_, 0.0, right_yaw, tf_buffer_);
     tf_broadcaster_->sendTransform(ts_msg);
 
     // midpoint
-    mid_theta = (front_ix - left_ix - (right_ix - left_ix) / 2.0) * last_laser_.angle_increment;
+    mid_theta = (front_ix - left_ix - (right_ix - left_ix) / 2.0) *
+                last_laser_.angle_increment;
 
-    mid_x = (left_range * cos(left_theta) + right_range * cos(right_theta)) / 2.0;
-    mid_y = (left_range * sin(left_theta) + right_range * sin(right_theta)) / 2.0;
+    mid_x =
+        (left_range * cos(left_theta) + right_range * cos(right_theta)) / 2.0;
+    mid_y =
+        (left_range * sin(left_theta) + right_range * sin(right_theta)) / 2.0;
 
     // Due to the 180-deg roll of robot_front_laser_base_link
     mid_y *= -1;
@@ -453,9 +457,9 @@ void CartApproach::broadcaster_cb() {
                  "(broadcaster_cb) TF \"midpoint\" at rel coords (x=%f, "
                  "y=%f, yaw=%f)",
                  mid_x, mid_y, mid_yaw);
-    ts_msg = tf_stamped_from_relative_coordinates(
+    ts_msg = tf_stamped_from_relative_coordinates_3d(
         this->get_clock()->now(), "map", "robot_front_laser_base_link",
-        "midpoint", mid_x, mid_y, mid_yaw, tf_buffer_);
+        "midpoint", mid_x, mid_y, 0.0, PI_, 0.0, mid_yaw, tf_buffer_);
     tf_broadcaster_->sendTransform(ts_msg);
   }
 }
