@@ -747,10 +747,11 @@ This may take a few tries, where the robot backs up to start a new try. Here's a
  ![Backing up for another attempt](assets/face_cart_back_up_algorithm.png)    
 
 **Much better, accurate, robust, and elegant approach:**  
-1. Use the ranges and angles of the edge rays (or TFs, if published) to localize the midpoint.
+1. Not necessary to be facing straight in to localize the midpoint. Moreover, it is much more difficult to achieve that than what is described here. Use the ranges and angles of the edge rays (or TFs, if published) to localize the midpoint.
 2. Compute the normal and calculate the yaw that corresponds to it.
 3. (Optional) Un-roll the relative TFs so that `go_to_frame` would work correctly without 
-4. (Optional) Gather a cluster of midpoints and calculate the mean position.  
+4. (Optional) Gather a cluster of midpoints and calculate the mean position.
+5. Use `go_to_frame` using the guidance TFs `"cart_frame_front_midpoint"` and `"cart_frame_centerpoint"`.
 
 | Gazebo | Rviz2 |
 | --- | --- |
