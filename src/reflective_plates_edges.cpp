@@ -440,7 +440,7 @@ void CartApproach::broadcaster_cb() {
     tf_broadcaster_->sendTransform(ts_msg);
 
     // midpoint
-    mid_theta = (right_ix - left_ix) / 2.0 * last_laser_.angle_increment;
+    mid_theta = (front_ix - left_ix - (right_ix - left_ix) / 2.0) * last_laser_.angle_increment;
 
     x = (left_range * cos(left_theta) + right_range * cos(right_theta)) / 2.0;
     y = (left_range * sin(left_theta) + right_range * sin(right_theta)) / 2.0;

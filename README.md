@@ -739,12 +739,22 @@ Works fine forward and backward in the simulator once the AMCL parameters `updat
 | ![4](assets/go_to_frame_4.png) |
 | ![5](assets/go_to_frame_5.png) |
 
-##### 2. Face cart straight in
+##### 2. Sending guidance TFs
 
 Face the cart, broadcast `"cart_frame_front_midpoint"` and `"cart_frame_centerpoint"`.
 
 This may take a few tries, where the robot backs up to start a new try. Here's an approximate strategy:  
  ![Backing up for another attempt](assets/face_cart_back_up_algorithm.png)    
+
+**Much better, accurate, robust, and elegant approach:**  
+1. Use the ranges and angles of the edge rays (or TFs, if published) to localize the midpoint.
+2. Compute the normal and calculate the yaw that corresponds to it.
+3. (Optional) Un-roll the relative TFs so that `go_to_frame` would work correctly without 
+4. (Optional) Gather a cluster of midpoints and calculate the mean position.  
+
+| Gazebo | Rviz2 |
+| --- | --- |
+| ![Midpoint in Gazebo](assets/midpoint_from_a_distance_gazebo.png) | ![Midpoint in Rviz2](assets/midpoint_from_a_distance_rviz2.png) |
 
 ##### 3. Pick up the cart
 
