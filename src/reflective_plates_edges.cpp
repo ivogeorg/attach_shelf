@@ -439,7 +439,27 @@ void CartApproach::broadcaster_cb() {
         "right_edge", right_x, right_y, right_yaw, tf_buffer_);
     tf_broadcaster_->sendTransform(ts_msg);
 
-    // midpoint
+//     // midpoint
+//     mid_theta = (front_ix - left_ix - (right_ix - left_ix) / 2.0) * last_laser_.angle_increment;
+
+//     mid_x = (left_range * cos(left_theta) + right_range * cos(right_theta)) / 2.0;
+//     mid_y = (left_range * sin(left_theta) + right_range * sin(right_theta)) / 2.0;
+
+//     // Due to the 180-deg roll of robot_front_laser_base_link
+//     mid_y *= -1;
+//     mid_yaw = -mid_theta;
+
+//     RCLCPP_DEBUG(this->get_logger(),
+//                  "(broadcaster_cb) TF \"midpoint\" at rel coords (x=%f, "
+//                  "y=%f, yaw=%f)",
+//                  mid_x, mid_y, mid_yaw);
+//     ts_msg = tf_stamped_from_relative_coordinates(
+//         this->get_clock()->now(), "map", "robot_front_laser_base_link",
+//         "midpoint", mid_x, mid_y, mid_yaw, tf_buffer_);
+//     tf_broadcaster_->sendTransform(ts_msg);
+//   }
+
+    // midpoint with correct yaw
     mid_theta = (front_ix - left_ix - (right_ix - left_ix) / 2.0) * last_laser_.angle_increment;
 
     mid_x = (left_range * cos(left_theta) + right_range * cos(right_theta)) / 2.0;
@@ -447,7 +467,7 @@ void CartApproach::broadcaster_cb() {
 
     // Due to the 180-deg roll of robot_front_laser_base_link
     mid_y *= -1;
-    mid_yaw = -mid_theta;
+    mid_yaw = -(mid_theta - PI_ / 2.0);
 
     RCLCPP_DEBUG(this->get_logger(),
                  "(broadcaster_cb) TF \"midpoint\" at rel coords (x=%f, "
@@ -458,6 +478,7 @@ void CartApproach::broadcaster_cb() {
         "midpoint", mid_x, mid_y, mid_yaw, tf_buffer_);
     tf_broadcaster_->sendTransform(ts_msg);
   }
+
 }
 
 /**
