@@ -29,7 +29,7 @@ Table of Contents
     * [10.6 Lab observations](#106-lab-observations)
 * [To do for warehouse servicing project](#to-do-for-warehouse-servicing-project)
 * [1. go_to_frame](#1-go_to_frame)
-* [2. Face cart straight in](#2-face-cart-straight-in)
+* [2. Sending guidance TFs](#2-sending-guidance-tfs)
 * [3. Pick up the cart](#3-pick-up-the-cart)
 * [4. Back up](#4-back-up)
 * [5. Services](#5-services)
