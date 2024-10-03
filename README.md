@@ -32,6 +32,10 @@ Table of Contents
     * [2. Sending guidance TFs](#2-sending-guidance-tfs)
     * [3. Finding the midpoint](#3-finding-the-midpoint)
     * [4. Solving for the relative TF yaw angle](#4-solving-for-the-relative-tf-yaw-angle)
+       * [1. The goal angle](#1-the-goal-angle)
+       * [2. Validity of the solution](#2-validity-of-the-solution)
+       * [3. Positioning the robot laser on the normal](#3-positioning-the-robot-laser-on-the-normal)
+       * [4. The trigonometry solution for the non-singular general case](#4-the-trigonometry-solution-for-the-non-singular-general-case)
     * [3. Pick up the cart](#3-pick-up-the-cart)
     * [4. Back up](#4-back-up)
     * [5. Services](#5-services)
@@ -778,7 +782,9 @@ There appear to be two singularities in this problem definition, when `mid_theta
 
 ##### 3. Positioning the robot laser on the normal
 
-This relies on getting the two ranges **AL** and **AR** to be equal (within a small tolerance). Depending on the current yaw of the robot, one of the three simplifying solutions above can be used. 
+This relies on getting the two ranges **AL** and **AR** to be equal (within a small tolerance). Depending on the current yaw of the robot, one of the three simplifying solutions above can be used.  
+
+![Aligning laser with LR normal](assets/moving_robot_to_align_laser_with_normal.png)    
 
 ##### 4. The trigonometry solution for the non-singular general case
 

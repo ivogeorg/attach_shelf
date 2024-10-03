@@ -193,6 +193,9 @@ private:
 
   // navigation utilities
   inline double get_current_yaw();
+  double get_midpoint_tf_yaw_by_moving_robot();
+  double get_midpoint_tf_yaw_by_trigonometry();
+
 
   /**
    * @brief Rotational-only robot motion, based on `twist.angular.z`
@@ -440,7 +443,7 @@ void CartApproach::broadcaster_cb() {
         "right_edge", right_x, right_y, 0.0, PI_, 0.0, right_yaw, tf_buffer_);
     tf_broadcaster_->sendTransform(ts_msg);
 
-    //     // midpoint
+    //     // midpoint with yaw attempt 1
     //     mid_theta = (front_ix - left_ix - (right_ix - left_ix) / 2.0) *
     //     last_laser_.angle_increment;
 
@@ -462,7 +465,7 @@ void CartApproach::broadcaster_cb() {
     //     tf_broadcaster_->sendTransform(ts_msg);
     //   }
 
-    // midpoint with correct yaw
+    // midpoint with yaw attempt 2
     mid_theta = (front_ix - left_ix - (right_ix - left_ix) / 2.0) *
                 last_laser_.angle_increment;
 
@@ -485,6 +488,11 @@ void CartApproach::broadcaster_cb() {
         this->get_clock()->now(), "map", "robot_front_laser_base_link",
         "midpoint", mid_x, mid_y, 0.0, PI_, 0.0, mid_yaw, tf_buffer_);
     tf_broadcaster_->sendTransform(ts_msg);
+
+    // NOTE: See notes in "4. Solving for the relative TF yaw angle"
+    // The yaw should be returned by one of the two methods:
+    // 1. double get_midpoint_tf_yaw_by_moving_robot()
+    // 2. double get_midpoint_tf_yaw_by_trigonometry()
   }
 }
 
@@ -665,6 +673,37 @@ inline double CartApproach::get_current_yaw() {
   return last_yaw_amcl_;
   //   return last_yaw_odom_;
 }
+
+/**
+ * @brief
+ * @return
+ */
+double CartApproach::get_midpoint_tf_yaw_by_moving_robot() {
+    // TODO
+    // while not aligned
+    //   use the two ranges and indices to decide which way to move
+    //   so as to be most likely to cross the normal through the midpoint
+    //   1. ranges, one vs another give robot position relative to normal
+    //   2. indices give robot orientation
+    //   3. ranges give a proximity tolerance band
+    //      1. too close and reflective plates become dimmer
+    //      2. too far and robot bumps into rear obstacle
+    //   move until the two ranges are equal (within tolerance)
+    //   if success, calculate yaw and return it
+    //   if failure, repeat
+    return 0.0;
+}
+
+/**
+ * @brief
+ * @return
+ */
+double CartApproach::get_midpoint_tf_yaw_by_trigonometry() {
+    // TODO
+    // Sketched in README
+    return 0.0;
+}
+
 
 /**
  * @brief Normalizes an angle between PI and -PI
