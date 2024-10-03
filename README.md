@@ -746,7 +746,8 @@ Face the cart, broadcast `"cart_frame_front_midpoint"` and `"cart_frame_centerpo
 This may take a few tries, where the robot backs up to start a new try. Here's an approximate strategy:  
  ![Backing up for another attempt](assets/face_cart_back_up_algorithm.png)    
 
-**Much better, accurate, robust, and elegant approach:**  
+##### 3. Finding the midpoint
+
 1. Not necessary to be facing straight in to localize the midpoint. Moreover, it is much more difficult to achieve that than what is described here. Use the ranges and angles of the edge rays (or TFs, if published) to localize the midpoint.
 2. Compute the normal and calculate the yaw that corresponds to it.
 3. (Optional) Un-roll the relative TFs so that `go_to_frame` would work correctly without 
@@ -761,6 +762,11 @@ TFs unrolled:
 | Gazebo | Rviz2 |
 | --- | --- |
 | ![Unrolled TFs in Gazebo](assets/unrolled_tfs_gazebo.png) | ![Untolled TFs in Rviz2](assets/unrolled_tfs_rviz2.png) |   
+
+##### 4. Solving for the relative TF yaw angle
+
+Have to solve for the angle of the TF `"cart_frame_front_midpoint"` relative to `"robot_front_laser_base_link"`. Here is a sketch of the general case:  
+![Goal angle for TF relative yaw](assets/midpoint_tf_angle_calc.png)
 
 
 ##### 3. Pick up the cart
