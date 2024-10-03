@@ -11,9 +11,9 @@ Table of Contents
     * [1. Put robot back in initial state in Gazebo w/o restart](#1-put-robot-back-in-initial-state-in-gazebo-wo-restart)
     * [2. ROS2 objects](#2-ros2-objects)
     * [3. Adding a frame](#3-adding-a-frame)
-    * [3.1. Brainstorming](#31-brainstorming)
-    * [3.2 Brainstorming](#32-brainstorming)
-    * [3.3 Strategy after brainstorming](#33-strategy-after-brainstorming)
+      * [3.1. Brainstorming](#31-brainstorming)
+      * [3.2 Brainstorming](#32-brainstorming)
+      * [3.3 Strategy after brainstorming](#33-strategy-after-brainstorming)
     * [4. tf2_ros::TransformListener for precision movement](#4-tf2_rostransformlistener-for-precision-movement)
     * [5. Parametrizing the laser scanner](#5-parametrizing-the-laser-scanner)
     * [6. Logging](#6-logging)
@@ -21,13 +21,13 @@ Table of Contents
     * [8. Attaching to the shelf/cart](#8-attaching-to-the-shelfcart)
     * [9. Terminating a service](#9-terminating-a-service)
     * [10. Rewriting approach and attachment to cart](#10-rewriting-approach-and-attachment-to-cart)
-    * [10.1 Notes](#101-notes)
-    * [10.2 Sequence of actions](#102-sequence-of-actions)
-    * [10.3 Adding frames](#103-adding-frames)
-    * [10.4 Uses of lookupTransform](#104-uses-of-lookuptransform)
-    * [10.5 Simulator anomalies](#105-simulator-anomalies)
-    * [10.6 Lab observations](#106-lab-observations)
-* [To do for warehouse servicing project](#to-do-for-warehouse-servicing-project)
+      * [10.1 Notes](#101-notes)
+      * [10.2 Sequence of actions](#102-sequence-of-actions)
+      * [10.3 Adding frames](#103-adding-frames)
+      * [10.4 Uses of lookupTransform](#104-uses-of-lookuptransform)
+      * [10.5 Simulator anomalies](#105-simulator-anomalies)
+      * [10.6 Lab observations](#106-lab-observations)
+* [Warehouse servicing project](#warehouse-servicing-project)
     * [1. go_to_frame](#1-go_to_frame)
     * [2. Sending guidance TFs](#2-sending-guidance-tfs)
     * [3. Finding the midpoint](#3-finding-the-midpoint)
@@ -35,11 +35,11 @@ Table of Contents
     * [3. Pick up the cart](#3-pick-up-the-cart)
     * [4. Back up](#4-back-up)
     * [5. Services](#5-services)
-    * [Services](#services)
-    * [Package name candidates](#package-name-candidates)
+      * [Service names](#service-names)
+      * [Package name candidates](#package-name-candidates)
     * [6. Parametrize position subscription](#6-parametrize-position-subscription)
-    * [Problem with amcl_pose](#problem-with-amcl_pose)
-    * [Problem with odom](#problem-with-odom)
+      * [Problem with amcl_pose](#problem-with-amcl_pose)
+      * [Problem with odom](#problem-with-odom)
     * [7. Publishing initial pose](#7-publishing-initial-pose)
     * [8. Subscribing to amcl pose](#8-subscribing-to-amcl-pose)
     * [9. Going from pose to pose](#9-going-from-pose-to-pose)
@@ -723,7 +723,7 @@ _**Possible solution 2:**_
 2. The `robot_front_laser_base_link` is rotated -180 deg around `x` in the simulator, but only -90 deg arounc `x` in the lab!
 
 
-### To do for warehouse servicing project
+### Warehouse servicing project
 
 This package is used as a submodule in the [`warehouse_project`](https://github.com/ivogeorg/warehouse_project). It is undergoing a substantial rework.
 
@@ -781,7 +781,7 @@ Use `"tf_load_pos"` to back up with the cart to where navigation can be switched
 
 This package will serve 3 services to be used for moving carts from loading to shipping. `attach_shelf` should be renamed.
 
-##### Services  
+##### Service names  
 
 1. `"cart_pick_up"`: approach, go under, pick up (`go_to_frame()`), back to `"tf_load_pos"`
 2. `"cart_set_down"`: (go to `"tf_ship_pos"`), set down, back up (`move()`), back to `"tf_face_ship_pos"`
@@ -803,7 +803,7 @@ This package will serve 3 services to be used for moving carts from loading to s
 5. Two different descriptive variables so the usage will be localized in `rotate` and `go_to_frame`. There, the parameter will already have been read and there can be private fields to use in conditional assignments. Note that there might be the need to assign a reference so the live value is used in the loops.
 6. Ultimately, `get_current_yaw()` is a convenient single place to localize the logic.
 
-##### Problem with `amcl_pose`
+##### 1. Problem with `amcl_pose`
 
 `rotate()` didn't work with yaw taken from `amcl_pose`. TODO: Investigate. Also, how to know the frequency publication for a topic.
 
@@ -847,8 +847,7 @@ average rate: 18.053
         min: 0.037s max: 0.079s std dev: 0.00786s window: 131
 ```
 
-
-##### Problem with `odom`
+##### 2. Problem with `odom`
 
 `odom` is all over the place, resulting in weird current yaw report. See figure below:  
 
