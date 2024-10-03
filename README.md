@@ -5,22 +5,22 @@ Table of Contents
 =================
 
 * [Submission notes](#submission-notes)
-* [1. Task 1 - Pre-approach](#1-task-1---pre-approach)
-* [2. Task 2 - Final approach](#2-task-2---final-approach)
+    * [1. Task 1 - Pre-approach](#1-task-1---pre-approach)
+    * [2. Task 2 - Final approach](#2-task-2---final-approach)
 * [Implementation notes*](#implementation-notes)
-* [1. Put robot back in initial state in Gazebo w/o restart](#1-put-robot-back-in-initial-state-in-gazebo-wo-restart)
-* [2. ROS2 objects](#2-ros2-objects)
-* [3. Adding a frame](#3-adding-a-frame)
+    * [1. Put robot back in initial state in Gazebo w/o restart](#1-put-robot-back-in-initial-state-in-gazebo-wo-restart)
+    * [2. ROS2 objects](#2-ros2-objects)
+    * [3. Adding a frame](#3-adding-a-frame)
     * [3.1. Brainstorming](#31-brainstorming)
     * [3.2 Brainstorming](#32-brainstorming)
     * [3.3 Strategy after brainstorming](#33-strategy-after-brainstorming)
-* [4. tf2_ros::TransformListener for precision movement](#4-tf2_rostransformlistener-for-precision-movement)
-* [5. Parametrizing the laser scanner](#5-parametrizing-the-laser-scanner)
-* [6. Logging](#6-logging)
-* [7. Using parameters and arguments from launch file](#7-using-parameters-and-arguments-from-launch-file)
-* [8. Attaching to the shelf/cart](#8-attaching-to-the-shelfcart)
-* [9. Terminating a service](#9-terminating-a-service)
-* [10. Rewriting approach and attachment to cart](#10-rewriting-approach-and-attachment-to-cart)
+    * [4. tf2_ros::TransformListener for precision movement](#4-tf2_rostransformlistener-for-precision-movement)
+    * [5. Parametrizing the laser scanner](#5-parametrizing-the-laser-scanner)
+    * [6. Logging](#6-logging)
+    * [7. Using parameters and arguments from launch file](#7-using-parameters-and-arguments-from-launch-file)
+    * [8. Attaching to the shelf/cart](#8-attaching-to-the-shelfcart)
+    * [9. Terminating a service](#9-terminating-a-service)
+    * [10. Rewriting approach and attachment to cart](#10-rewriting-approach-and-attachment-to-cart)
     * [10.1 Notes](#101-notes)
     * [10.2 Sequence of actions](#102-sequence-of-actions)
     * [10.3 Adding frames](#103-adding-frames)
@@ -28,36 +28,36 @@ Table of Contents
     * [10.5 Simulator anomalies](#105-simulator-anomalies)
     * [10.6 Lab observations](#106-lab-observations)
 * [To do for warehouse servicing project](#to-do-for-warehouse-servicing-project)
-* [1. go_to_frame](#1-go_to_frame)
-* [2. Sending guidance TFs](#2-sending-guidance-tfs)
-* [3. Pick up the cart](#3-pick-up-the-cart)
-* [4. Back up](#4-back-up)
-* [5. Services](#5-services)
+    * [1. go_to_frame](#1-go_to_frame)
+    * [2. Sending guidance TFs](#2-sending-guidance-tfs)
+    * [3. Finding the midpoint](#3-finding-the-midpoint)
+    * [4. Solving for the relative TF yaw angle](#4-solving-for-the-relative-tf-yaw-angle)
+    * [3. Pick up the cart](#3-pick-up-the-cart)
+    * [4. Back up](#4-back-up)
+    * [5. Services](#5-services)
     * [Services](#services)
     * [Package name candidates](#package-name-candidates)
-* [6. Parametrize position subscription](#6-parametrize-position-subscription)
+    * [6. Parametrize position subscription](#6-parametrize-position-subscription)
     * [Problem with amcl_pose](#problem-with-amcl_pose)
     * [Problem with odom](#problem-with-odom)
-* [7. Publishing initial pose](#7-publishing-initial-pose)
-* [8. Subscribing to amcl pose](#8-subscribing-to-amcl-pose)
-* [9. Going from pose to pose](#9-going-from-pose-to-pose)
-* [10. Oscillation on backing up](#10-oscillation-on-backing-up)
-* [11. Rviz2 and Gazebo out of synch](#11-rviz2-and-gazebo-out-of-synch)
-* [12. Normal to line between reflective plates](#12-normal-to-line-between-reflective-plates)
-* [13. "tf_cart_front_midpoint" coordinates are off](#13-tf_cart_front_midpoint-coordinates-are-off)
-* [14. Bug in incidence TF](#14-bug-in-incidence-tf)
+    * [7. Publishing initial pose](#7-publishing-initial-pose)
+    * [8. Subscribing to amcl pose](#8-subscribing-to-amcl-pose)
+    * [9. Going from pose to pose](#9-going-from-pose-to-pose)
+    * [10. Oscillation on backing up](#10-oscillation-on-backing-up)
+    * [11. Rviz2 and Gazebo out of synch](#11-rviz2-and-gazebo-out-of-synch)
+    * [12. Normal to line between reflective plates](#12-normal-to-line-between-reflective-plates)
+    * [13. "tf_cart_front_midpoint" coordinates are off](#13-tf_cart_front_midpoint-coordinates-are-off)
+    * [14. Bug in incidence TF](#14-bug-in-incidence-tf)
 
 <!-- Created by https://github.com/ekalinin/github-markdown-toc -->
-
-### attach_shelf
 
 An RB1 robot in a warehouse world moves forward, turns, detects a shelf, moves underneath it and attaches to it by raising its elevator. Warehouse both simulated in Gazebo and a real physical playpen in the Barcelona office of The Construct.
 
 ![RB1 attaches to shelf](assets/rb1_attach_shelf.gif)  
 
-#### Submission notes
+### Submission notes
 
-##### 1. Task 1 - Pre-approach
+#### 1. Task 1 - Pre-approach
 
 1. Launching
    ```
@@ -75,7 +75,7 @@ An RB1 robot in a warehouse world moves forward, turns, detects a shelf, moves u
    | --- | --- |
    | ![Pre-approach in Gazebo](assets/subm_pre_approach_gazebo.png) | ![Pre-approach in Rviz2](assets/subm_pre_approach_rviz2.png) |
 
-##### 2. Task 2 - Final approach
+#### 2. Task 2 - Final approach
 
 1. Launching
    ```
@@ -99,11 +99,11 @@ An RB1 robot in a warehouse world moves forward, turns, detects a shelf, moves u
    | ![Cart attached](assets/attached_to_cart_gazebo.png) | ![Cart attached](assets/attached_to_cart_rviz2.png) |  
 
 
-#### Implementation notes*
+### Implementation notes*
 
 _*Cumulative for both Task 1 and Task 2._  
 
-##### 1. Put robot back in initial state in Gazebo w/o restart
+#### 1. Put robot back in initial state in Gazebo w/o restart
 
 _Optional_  
 
@@ -112,7 +112,7 @@ _Optional_
 3. The service server is provided by node `/demo/gazebo_ros_state`.  
 4. Probably need to use `/demo/get_entity_state` to get the initial state.  
 
-##### 2. ROS2 objects
+#### 2. ROS2 objects
 
 1. Subscriber to `/scan` (`sensor_msgs/msg/LaserScan`).
 2. Subscriber to `/odom` (`nav_msgs/msg/Odometry`).
@@ -123,7 +123,7 @@ _Optional_
 7. Publisher to `/elevator_up` (`std_msgs/msg/String`).  
 8. Transform listener.
 
-##### 3. Adding a frame
+#### 3. Adding a frame
 
 Need to add a frame in the middle of the reflective plates of the shelf.  
 
@@ -181,7 +181,7 @@ Need to add a frame in the middle of the reflective plates of the shelf.
 | --- | --- |
 | ![Facing shelf Gazebo](assets/facing_shelf_gazebo.png) | ![Facing shelf Rviz2](assets/facing_shelf_rviz2.png) |   
 
-###### 3.1. Brainstorming
+##### 3.1. Brainstorming
 
 Briefly, after the RB1 robot has completed the pre-approach, has faced the crate/shelf, and has identified the two reflective plates, this TF needs to be added right in between the reflective plates. Questions:
 1. In the image showing the new TF in Rviz2, `cart_frame` seems to be defined relative to `robot_front_laser_base_link`. The arrow points from `cart_frame` to `robot_front_laser_base_link`. If the robot moves, won't `cart_frame` also move?
@@ -189,7 +189,7 @@ Briefly, after the RB1 robot has completed the pre-approach, has faced the crate
 3. Shouldn't `cart_frame`, which we need to stay in place to be used for moving the robot toward it, be defined in a transform from `odom` (or whatever the root link in the TF tree is)?
 4. If `cart_frame` will move with `robot_front_laser_base_link`, do we have to recalculate the point and modify the TF broadcast? That seems to be counterintuitive, not to mention difficult, because the reflective plates will disappear from "laser view" as the robot approaches the crate/shelf.
 
-###### 3.2 Brainstorming
+##### 3.2 Brainstorming
 
 1. `cart_frame` should be defined as a TF relative to `odom`.
 2. Solve the SAS triangle. Get:
@@ -200,7 +200,7 @@ Briefly, after the RB1 robot has completed the pre-approach, has faced the crate
 5. Use a `StaticTransformBroadcaster` to publish the TF between `odom` and `cart_frame`. By default, this is published once. 
 6. Proceed with the final approach.
 
-###### 3.3 Strategy after brainstorming
+##### 3.3 Strategy after brainstorming
 
 **Note:** All in code. No hardcoding!  
 
@@ -311,7 +311,7 @@ At `obstacle=0.45`, robot can reach `cart_frame` without complex computations:
    ```
 
 
-##### 4. `tf2_ros::TransformListener` for precision movement
+#### 4. `tf2_ros::TransformListener` for precision movement
 
 1. Use a `TransformListener` with `cart_frame` and `robot_base_footprint` frame of the robot to issue precision commands for the final approach.
 2. Correct the pose of the robot before approach. Since the main linear approach will be guided by the TF between `robot_base_link` and `cart_frame`, but `cart_frame` was originally defined relative to `robot_front_laser_base_link`, the robot should travel forward along the `x` dimension (because the two frames are aligned) the distance between `robot_base_link` and `robot_front_laser_base_link`, which is `0.21` as can be seen in the [xacro file used to spawn the RB1 robot](xacro/rb1_ros2_base.urdf.xacro).
@@ -457,7 +457,7 @@ At `obstacle=0.45`, robot can reach `cart_frame` without complex computations:
 ```
 4. Actually, the same happens without continous use of `lookupTransform`. The robot consistently misses the goal `cart_frame` on the left (if starting from the left).
 
-##### 5. Parametrizing the laser scanner
+#### 5. Parametrizing the laser scanner
 
 1. This is a weird one!
    ```
@@ -481,7 +481,7 @@ At `obstacle=0.45`, robot can reach `cart_frame` without complex computations:
 3. **NOTE:** Most importantly, it cycles CW so index 0 is at angle ~135 degrees, exactly the opposite of the standard direction and convention. See [data/full_scanner.txt](data/full_scanner.txt) for a single run with the robot having completed the pre-approach and facing the cart/shelf. See the `inf` runs when the scanner passes through the two doors.  
    ![Full scan position](assets/full_scan_position.png)  
 
-##### 6. Logging
+#### 6. Logging
 
 1. Setting logging severity level (map frees from dependency on actual values):
    ```
@@ -515,7 +515,7 @@ At `obstacle=0.45`, robot can reach `cart_frame` without complex computations:
    }
    ```
 
-##### 7. Using parameters and arguments from launch file
+#### 7. Using parameters and arguments from launch file
 
 1. Launch file declares parameters by name and default value, which is not enough by itself. See next step
    ```
@@ -627,7 +627,7 @@ Arguments (pass arguments as '<name>:=<value>'):
         (default: 'false')
 ```
 
-##### 8. Attaching to the shelf/cart
+#### 8. Attaching to the shelf/cart
 
 1. The topic is `/elevator_up` and is of type `std_msgs::msg::String`. The reverse has the logical topic `/elevator_down`.
 2. Need to send "data: `1`" on the command line but from the python code in [`attach_client.py`](scripts/attach_client.py) it looks like `msg.data = 1`. An empty string works, too:
@@ -639,19 +639,19 @@ Arguments (pass arguments as '<name>:=<value>'):
    ![RB1 moving with cart on top](assets/rb1_moving_with_cart-1.png)  
 5. Interestingly enough, the shelf/cart doesn't have to be on top of the RB1 robot to attach to it. It would actually "jump" to position when `elevator_up` is written to.
    
-##### 9. Terminating a service
+#### 9. Terminating a service
 
 1. Services are generally not terminated and/or restarted. It requires a whole _bring-up_ which might involve restarting the whole system.
 2. If necessary (and benign), short of using a lifecycle node (note: lc nodes not fully developed), one can use a separate `Trigger` or `Empty` call to a "shutdown" service in the main service node, the callback for which can do some basic cleanup and call `rclcpp::shutdown()` after some time, say, 5-10 s. 
 
-##### 10. Rewriting approach and attachment to cart
+#### 10. Rewriting approach and attachment to cart
 
-###### 10.1 Notes
+##### 10.1 Notes
 
 1. Service name will be `/cart_pick_up`.  
 2. The general approach is to first align the robot's centroid with the lengthwise axis of the cart. This means that the distances to the reflective plates are equal. Then rotate to face along the midpoint between the plates and begin the approach. Possibly use the two supporting rods behind the plates to maintain alignment.
 
-###### 10.2 Sequence of actions
+##### 10.2 Sequence of actions
 
 1. _Broadcast a static TF from `map` to `load_pos_tf` using a composition of TF from `map` to `robot_base_footprint` and an all-zero TF `robot_base_footprint` to `load_pos_tf`._
 1. Identify the reflective plates. _Note that the intensity values vary with ambient light. In the original location, `intensities[i] > 3000` works, but not universally._
@@ -665,7 +665,7 @@ Arguments (pass arguments as '<name>:=<value>'):
 9. Pick up the cart.
 10. Back up to `load_pos_tf`.
 
-###### 10.3 Adding frames
+##### 10.3 Adding frames
 
 1. `"load_pos_tf"`: Use `geometry_msgs/msg/PoseStamped` `"loading_position"` coordinates to create and publish TF `"map"`-`"load_pos_tf"`
 2. `"face_ship_pos_tf"`: Use `geometry_msgs/msg/PoseStamped` `"face_shiping_position"` coordinates to create and publish TF `"map"`-`"face_ship_pos_tf"`
@@ -690,7 +690,7 @@ Notes on screenshot above:
 3. The node containing the `StaticTransformBroadcaster` which publishes the TFs needs to sleep for 2 seconds before it terminates for the TFs to be registered.
 4. These TFs are to be used as targets for the robot to back up, from having picked up the cart and having set it down, respectively.
 
-###### 10.4 Uses of `lookupTransform`
+##### 10.4 Uses of `lookupTransform`
 
 _**Goal:**_ `listener_cb` is on a _timer_ so that a changing transform is used to program motion dynamically. However, this makes the function cluttered and/or an `if..else` cascade. How can this be done elegantly?  
 
@@ -710,24 +710,24 @@ _**Possible solution 2:**_
 2. Construct timer in the function, bind a lambda callback to do `lookupTransform` and publish `twist`, and set `done` when motion complete (per the TF), and add timer to callback group.
 3. `move` blocks on `done` until lambda sets it when the motion is complete (within _tolerance_, which can be a parameter with a default).
 
-###### 10.5 Simulator anomalies
+##### 10.5 Simulator anomalies
 
 1. When approaching the cart, with only forward motion set (`teleop` or `cmd_vel`) the robot turns to the left and has to be corrected!ll
 2. When the robot picks up the cart, the cart flips so that the reflective plates are on the other side.
 3. When decreasing/increasing speeds in `teleop`, the robot moves.
 4. Once picked up and set down, subsequent commands to `/elevator_*` don't have a "physical" effect.
 
-###### 10.6 Lab observations
+##### 10.6 Lab observations
 
 1. There are 3 frames, `robot_cart_laser`, `robot_cart_laser_noisy`, and `robot_cart_laser_noisy_0`, which are set where `cart_frame` is meant to be set, and when the robot is facing the cart straight in. It appears and then fades, then appears again, possibly being published dynamically and going stale, and then published again.
 2. The `robot_front_laser_base_link` is rotated -180 deg around `x` in the simulator, but only -90 deg arounc `x` in the lab!
 
 
-#### To do for warehouse servicing project
+### To do for warehouse servicing project
 
 This package is used as a submodule in the [`warehouse_project`](https://github.com/ivogeorg/warehouse_project). It is undergoing a substantial rework.
 
-##### 1. `go_to_frame`
+#### 1. `go_to_frame`
 
 Works fine forward and backward in the simulator once the AMCL parameters `update_min_a` and `update_min_d` were set to positive values.
 
@@ -739,14 +739,14 @@ Works fine forward and backward in the simulator once the AMCL parameters `updat
 | ![4](assets/go_to_frame_4.png) |
 | ![5](assets/go_to_frame_5.png) |
 
-##### 2. Sending guidance TFs
+#### 2. Sending guidance TFs
 
 Face the cart, broadcast `"cart_frame_front_midpoint"` and `"cart_frame_centerpoint"`.
 
 This may take a few tries, where the robot backs up to start a new try. Here's an approximate strategy:  
  ![Backing up for another attempt](assets/face_cart_back_up_algorithm.png)    
 
-##### 3. Finding the midpoint
+#### 3. Finding the midpoint
 
 1. Not necessary to be facing straight in to localize the midpoint. Moreover, it is much more difficult to achieve that than what is described here. Use the ranges and angles of the edge rays (or TFs, if published) to localize the midpoint.
 2. Compute the normal and calculate the yaw that corresponds to it.
@@ -763,30 +763,30 @@ TFs unrolled:
 | --- | --- |
 | ![Unrolled TFs in Gazebo](assets/unrolled_tfs_gazebo.png) | ![Untolled TFs in Rviz2](assets/unrolled_tfs_rviz2.png) |   
 
-##### 4. Solving for the relative TF yaw angle
+#### 4. Solving for the relative TF yaw angle
 
 Have to solve for the angle of the TF `"cart_frame_front_midpoint"` relative to `"robot_front_laser_base_link"`. Here is a sketch of the general case:  
 ![Goal angle for TF relative yaw](assets/midpoint_tf_angle_calc.png)
 
 
-##### 3. Pick up the cart
+#### 3. Pick up the cart
 
 Without service, use the fixed frames in (2) to move in underneath the cart and pick it up.
 
-##### 4. Back up
+#### 4. Back up
 
 Use `"tf_load_pos"` to back up with the cart to where navigation can be switched to `BasicNavigator::goToPose()` again.
 
-##### 5. Services
+#### 5. Services
 
 This package will serve 3 services to be used for moving carts from loading to shipping. `attach_shelf` should be renamed.
 
-###### Services  
+##### Services  
 
 1. `"cart_pick_up"`: approach, go under, pick up (`go_to_frame()`), back to `"tf_load_pos"`
 2. `"cart_set_down"`: (go to `"tf_ship_pos"`), set down, back up (`move()`), back to `"tf_face_ship_pos"`
 
-###### Package name candidates
+##### Package name candidates
 
 1. `warehouse_services`
 2. `warehouse_cart`
@@ -794,7 +794,7 @@ This package will serve 3 services to be used for moving carts from loading to s
 4. `warehouse_cart_servicing`
 4. `warehouse_cart_services` *
 
-##### 6. Parametrize position subscription
+#### 6. Parametrize position subscription
 
 1. If not run along with `nav2`, use `odom`, otherwise use `amcl_pose`. 
 2. Initialize a variable `position_sub_`, creating a subscription for the correct type, `nav_msgs::msg::Odometry` for `odom` and `geometry_msgs::msg::PoseWithCovarianceStamped` for `amcl_pose`.
@@ -803,7 +803,7 @@ This package will serve 3 services to be used for moving carts from loading to s
 5. Two different descriptive variables so the usage will be localized in `rotate` and `go_to_frame`. There, the parameter will already have been read and there can be private fields to use in conditional assignments. Note that there might be the need to assign a reference so the live value is used in the loops.
 6. Ultimately, `get_current_yaw()` is a convenient single place to localize the logic.
 
-###### Problem with `amcl_pose`
+##### Problem with `amcl_pose`
 
 `rotate()` didn't work with yaw taken from `amcl_pose`. TODO: Investigate. Also, how to know the frequency publication for a topic.
 
@@ -848,13 +848,13 @@ average rate: 18.053
 ```
 
 
-###### Problem with `odom`
+##### Problem with `odom`
 
 `odom` is all over the place, resulting in weird current yaw report. See figure below:  
 
 ![Weird orientation of `odom`](assets/odom_weird_orientation.png)  
 
-##### 7. Publishing initial pose
+#### 7. Publishing initial pose
 
 **Gist:**  
 
@@ -873,7 +873,7 @@ The from-code publish:
 1. Change `set_initial_pose: true` and set `initial_pose` parameter values (`x`, `y`, `z`, `yaw`) with `"init_position"`.
 2. Use this [3D Rotation Converter](https://www.andre-gaschler.com/rotationconverter/) to get the yaw from the orientation quaternion of the pose. 
 
-##### 8. Subscribing to amcl pose
+#### 8. Subscribing to amcl pose
 
 **Gist:**
 
@@ -922,7 +922,7 @@ user:~/ros2_ws$ ros2 launch attach_shelf cart_approach_test.launch.py
   }
 ```  
 
-##### 9. Going from pose to pose
+#### 9. Going from pose to pose
 
 **Gist:**
 
@@ -940,7 +940,7 @@ There is a vastly inaccurate heading computed to `"tf_ship_pos"` when robot is a
 **Solution:**  
 Do not subtract the robot's yaw from the result of `atan2(y, x)`. The latter is already in the robot's frame if the parent/origin frame is `robot_base_footprint`.
 
-##### 10. Oscillation on backing up
+#### 10. Oscillation on backing up
 
 **Gist:**  
 
@@ -958,7 +958,7 @@ When commanded to back up from current position to a TF (situated generally behi
    | **z > 0** | <img src="assets/fwd_left_arrow.png" width="100"/> | <img src="assets/bwd_right_arrow.png" width="100"/> |
 
 
-##### 11. Rviz2 and Gazebo out of synch
+#### 11. Rviz2 and Gazebo out of synch
 
 **Gist:**  
 
@@ -992,12 +992,12 @@ The hack of non-positive `update_min_a` and `update_min_d` parameters for AMCL d
 
 ![Negative eigenvalue in posigion](assets/negative_eigenvalue_for_position_lab.png)  
 
-##### 12. Normal to line between reflective plates
+#### 12. Normal to line between reflective plates
 
 **Gist:**  
 The TF `"tf_cart_front_midpoint"` should have orientation that is normal to the line between the plates. This might be the `yaw` that is returned by `solve_sas_triangle`, but what is the angle that is passed to `StaticTransformBroadcaster`?
 
-##### 13. `"tf_cart_front_midpoint"` coordinates are off
+#### 13. `"tf_cart_front_midpoint"` coordinates are off
 
 **Gist:**  
 The `y` is off. The `x` and `yaw` seem to be fine.
@@ -1015,7 +1015,7 @@ The `y` is off. The `x` and `yaw` seem to be fine.
    3. `TransformBroadcaster` in a loop.  
    4. If reflective plates recognized, publish `"tf_cart_front_midpoint"`. _Has to be in the right place and be fairly stable._  
 
-##### 14. Bug in incidence TF
+#### 14. Bug in incidence TF
 
 **Gist:**  
 
