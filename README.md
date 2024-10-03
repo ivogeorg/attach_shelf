@@ -766,8 +766,26 @@ TFs unrolled:
 #### 4. Solving for the relative TF yaw angle
 
 Have to solve for the angle of the TF `"cart_frame_front_midpoint"` relative to `"robot_front_laser_base_link"`. Here is a sketch of the general case:  
-![Goal angle for TF relative yaw](assets/midpoint_tf_angle_calc.png)
+![Goal angle for TF relative yaw](assets/midpoint_tf_angle_calc.png)  
 
+##### 1. The goal angle
+
+The goal angle is highlighted in the sketch and its between the forward direction of `"robot_front_laser_base_link"` and the normal to LR going through the midpoint M. It is possible to find this angle using trigonometry and knowns starting with the AR and AL ranges and the angle RAL between them.
+
+##### 2. Validity of the solution
+
+There appear to be two singularities in this problem definition, when `mid_theta` is either **90 deg** or **0 deg**, both of which can only happen if the origin of the laser rays (which is defined in the URDF/Xacro model files to be the origin of `"robot_front_laser_base_link"`) lies on the LR normal through M. In the first case the relative yaw of `"cart_frame_front_midpoint"` is _90 deg__ and, in the second, _0 deg_. Another simplifying case is when the origin of the laser rays is on the normal, but the angle relative to RL is in (0, 90). In that case, the relative TF yaw angle is 90 - `mid_theta`. _Note that this suggests the benefit of a solution that contains a reliable algorithm to stop the robot with the laser origin lying on the LR normal through M. This approach is sketched out in the next section._
+
+##### 3. Positioning the robot laser on the normal
+
+This relies on getting the two ranges **AL** and **AR** to be equal (within a small tolerance). Depending on the current yaw of the robot, one of the three simplifying solutions above can be used. 
+
+##### 4. The trigonometry solution for the non-singular general case
+
+1. Solve the LAR triangle by the SAS method with AR, LR, and the angle <LAR known. This yields the angle <ARL, among other things.
+2. The angle <RAM is known (half of <LAR), so using the sum of the angles of a triangle, get the angle <AMR.
+3. The angle <MAS is known (`mid_theta`) and the angle <AML is 180 - <AMR, so get the angle <MNS.
+4. In the triangle MNS, the _goal angle_ is the angle <MSN and that is 90 - <MNS.
 
 #### 3. Pick up the cart
 
